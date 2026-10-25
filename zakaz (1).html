@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#E6E8EB">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hed zakaz">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="zakaz.webmanifest">
+<title>Hed zakaz</title>
+<style>
+:root{
+  --bg:#F2F3F5; --panel:#FFFFFF; --soft:#F7F8FA; --line:#D7DAE0; --ink:#3A3F47; --ink2:#6B7178;
+  --acc:#6B7178; --accInk:#FFFFFF; --accSoft:#ECEEF1; --hdrBg:#E6E8EB;
+  --ok:#2E7D4F; --okSoft:#EAF4EE; --warn:#9A6A12; --warnSoft:#F8F1E2; --bad:#B42318; --badSoft:#FBECEA;
+  --overlay:rgba(107,113,120,.40); color-scheme:light;
+}
+:root[data-hbmode="night"]{
+  --bg:#50555D; --panel:#5B6068; --soft:#646971; --line:#767C84; --ink:#F7F8FA; --ink2:#DADDE1;
+  --acc:#E9EBEE; --accInk:#3A3F47; --accSoft:#646971; --hdrBg:#474C53;
+  --ok:#8EDDB0; --okSoft:rgba(142,221,176,.16); --warn:#F0C46A; --warnSoft:rgba(240,196,106,.16); --bad:#FF9E95; --badSoft:rgba(255,158,149,.16);
+  --overlay:rgba(58,63,71,.45); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+input::placeholder,textarea::placeholder{color:var(--ink2);opacity:.7}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+body{padding-bottom:env(safe-area-inset-bottom,0px);overflow-x:hidden}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:0}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:10px 14px;font-weight:600;white-space:nowrap}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+header{position:sticky;top:0;z-index:5;background:var(--hdrBg);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0}
+.hrow{display:flex;align-items:center;gap:10px}
+.hrow b{font-size:17px}.hrow small{display:block;color:var(--ink2);font-size:12px}
+.hrow .sp{flex:1}
+.tabs{display:flex;gap:6px;margin-top:10px}
+.tabs button{flex:1;border:0;background:transparent;color:var(--ink2);padding:10px 6px;font-weight:700;border-bottom:3px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
+main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h3{margin:0 0 10px;font-size:15px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.field>span{font-size:13px;color:var(--ink2)}
+.seg{display:flex;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;margin-bottom:10px}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:9px;font-weight:700;color:var(--ink2)}
+.seg button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.list{display:flex;flex-direction:column}
+.item{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .nm{flex:1;min-width:0}
+.item .nm b{display:block;font-weight:600;overflow-wrap:anywhere}
+.item .nm small{color:var(--ink2)}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--soft);color:var(--ink);font-weight:800}
+.qty input{width:56px;text-align:center;padding:7px 4px}
+.pr{width:96px;text-align:right;padding:7px 8px}
+.ltab{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ltab .lh,.ltab .lr{display:grid;grid-template-columns:minmax(0,1fr) 96px 126px 92px;gap:10px;align-items:center;padding:10px 12px}
+.ltab .lh{background:var(--soft);font-size:13px;font-weight:700;color:var(--ink2);border-bottom:1px solid var(--line)}
+.ltab .lr{border-bottom:1px solid var(--line)}
+.ltab .lr .c-n b{display:block;font-weight:600;overflow-wrap:anywhere}
+.ltab .lr .c-n small{display:block;color:var(--ink2);font-size:12px}
+.ltab .c-p input{text-align:right;padding:7px 8px}
+.ltab .nmi{padding:7px 9px;font-weight:600;margin-bottom:3px}
+.ltab .c-s,.ltab .lh .c-s{text-align:right}
+.ltab .lh .c-p{text-align:right}.ltab .lh .c-q{text-align:center}
+.ltab .lf{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px;background:var(--soft);font-weight:600}
+.ltab .lf b{font-size:18px}
+@media (max-width:560px){
+  .ltab .lh,.ltab .lr{grid-template-columns:minmax(0,1fr) 112px minmax(70px,auto);row-gap:8px;padding:10px}
+  .ltab .lh .c-n{display:none}
+  .ltab .lr .c-n{grid-column:1 / -1}
+  .ltab .lh .c-p,.ltab .c-p{order:1}.ltab .lh .c-q,.ltab .c-q{order:2}.ltab .lh .c-s,.ltab .c-s{order:3}
+}
+.muted{color:var(--ink2)}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--accSoft);color:var(--ink)}
+.tag.ok{background:var(--okSoft);color:var(--ok)}.tag.warn{background:var(--warnSoft);color:var(--warn)}.tag.bad{background:var(--badSoft);color:var(--bad)}
+.tot{display:flex;justify-content:space-between;align-items:baseline;font-size:20px;font-weight:800;margin:6px 0}
+.sticky{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));z-index:6}
+.sticky .in{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.sticky .in .sum{flex:1;min-width:0}
+.sticky .in .sum b{display:block;font-size:19px}
+.res{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:var(--panel)}
+.res .item{padding:10px 10px;cursor:pointer}
+.res .item:hover{background:var(--soft)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.stats div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+.stats small{display:block;color:var(--ink2);font-size:12px}.stats b{font-size:16px;overflow-wrap:anywhere}
+.auth{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.auth .box{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px 20px}
+.auth h1{margin:6px 0 2px;font-size:22px}
+.msg{min-height:20px;margin-top:10px;font-size:14px}.msg.err{color:var(--bad)}.msg.ok{color:var(--ok)}
+.links{display:flex;justify-content:space-between;gap:10px;margin-top:14px;font-size:14px;flex-wrap:wrap}
+.links a{color:var(--ink);text-decoration:underline;cursor:pointer}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:600;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
+.toast.err{border-color:var(--bad);color:var(--bad)}
+.pend{background:var(--warnSoft);color:var(--warn);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;margin-bottom:12px}
+.ov{position:fixed;inset:0;background:var(--overlay);z-index:15;display:flex;align-items:flex-end;justify-content:center}
+.ov .sheet{background:var(--panel);width:100%;max-width:720px;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:90vh;overflow:auto}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sellers{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:12px 0}
+.sellers button{padding:16px 10px;font-size:16px}
+.hint{font-size:13px;color:var(--ink2);margin:6px 0 0}
+.who{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:6px 10px;font-weight:700;color:var(--ink);white-space:nowrap;max-width:42vw;overflow:hidden;text-overflow:ellipsis}
+.hrow>div:first-child{min-width:0;flex:1}.hrow b{white-space:nowrap}.hrow small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .sp{display:none}
+.stk{color:var(--ink2)}
+@media (min-width:900px){main,.sticky .in{max-width:900px}}
+@media (max-width:380px){.pr{width:80px}.qty input{width:46px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+'use strict';
+/* Hed zakaz — sotuvchilar kompyuterida mijozdan zakaz olish.
+   Zakazlar Google Sheets'ga yoziladi (Google Apps Script veb-ilovasi orqali). Hed balans bilan bog'langan bo'lsa ostatka ko'rinadi. */
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const num=v=>{const x=parseFloat(String(v??'').replace(/\s/g,'').replace(',','.'));return isFinite(x)?x:0};
+const r2=x=>Math.round(x*100)/100;
+const today=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}catch(e){const d=new Date(Date.now()+5*3600e3);return d.toISOString().slice(0,10)}};
+const uid=()=>'z'+Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+const blank=()=>({pay:'cash',cid:'',client:'',phone:'',lines:[],note:''});
+const DEF_URL='https://script.google.com/macros/s/AKfycbyI39wOuo4c7-R1pI9wwjfKhiO5JgNyTnHJT0xD0vbMTknStowVSdskmpoc0vBz_vwd/exec';   // HED serveri — sotuvchi faqat PIN kiritadi
+let SET=lsGet('hz_set',null);            // {url, pin} — shu kompyuter uchun bir marta
+let INIT=lsGet('hz_init',null);          // server bergan: kompaniya, valyuta, sotuvchilar, kalkulyator, (bog'langan bo'lsa) katalog va ostatka
+let SELLER=lsGet('hz_seller2','');       // shu kompyuterdagi sotuvchi
+let OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all';
+let F=lsGet('hz_draft',null)||blank();
+const cur=()=>(INIT&&INIT.currency)||'USD';
+const linked=()=>!!(INIT&&INIT.linked);
+const fmt=(n,c)=>{c=c||cur();const v=Math.abs(n)<0.005?0:n;if(c==='UZS')return Math.round(v).toLocaleString('ru-RU').replace(/\s/g,' ')+" so'm";
+  return '$'+(Math.round(v*100)/100).toLocaleString('ru-RU',{minimumFractionDigits:Number.isInteger(Math.round(v*100)/100)?0:2,maximumFractionDigits:2}).replace(/\s/g,' ').replace(',','.')};
+const uzs=n=>cur()==='USD'&&INIT&&num(INIT.rate)>0?' ≈ '+fmt(n*num(INIT.rate),'UZS'):'';
+function setMode(m){m=m==='night'?'night':'day';document.documentElement.dataset.hbmode=m;lsSet('hb_mode',m);const t=document.querySelector('meta[name=theme-color]');if(t)t.content=m==='night'?'#474C53':'#E6E8EB'}
+setMode(lsGet('hb_mode','day'));
+let tT;function toast(m,err){let t=$('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=m;t.className='toast'+(err?' err':'');clearTimeout(tT);tT=setTimeout(()=>t.remove(),err?5000:2600)}
+const saveDraft=()=>lsSet('hz_draft',F);
+const lineSum=l=>r2(num(l.qty)*num(l.price));
+const total=()=>r2(F.lines.reduce((a,l)=>a+lineSum(l),0));
+const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+
+/* ---------- server (Google Apps Script) ---------- */
+async function api(a,extra,set){
+  set=set||SET;const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);let r;
+  try{r=await fetch(set.url,{method:'POST',body:JSON.stringify(Object.assign({a,pin:set.pin},extra||{})),signal:ctl.signal,cache:'no-store',redirect:'follow'})}   // text/plain — Google skriptiga to'g'ridan-to'g'ri (preflightsiz)
+  catch(e){const x=new Error("Internet yo'q yoki server javob bermadi");x.net=true;throw x}
+  finally{clearTimeout(tm)}
+  let j;try{j=await r.json()}catch(e){const x=new Error(r.status>=500||r.ok?'Google serveri vaqtincha javob bermadi ('+r.status+')':"Server javobi tushunarsiz — Google skript manzilini tekshiring");x.net=r.status>=500;x.temp=r.ok;throw x}
+  if(!j||!j.ok){const x=new Error((j&&j.error)||'Xato');x.auth=!!(j&&j.auth);x.temp=!!(j&&j.temp);throw x}
+  return j}
+function setNet(v){ONLINE=v;const el=$('#net');if(el){el.textContent=v?'':"Internet yo'q";el.className=v?'':'tag bad'}}
+
+/* ---------- HED kalkulyator narxnomasi (CSV): Bolim | Mahsulot | Narx ---------- */
+function parseCsv(t){t=String(t||'').replace(/^﻿/,'');const rows=[];let r=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c;continue}
+    if(c==='"'&&f==='')q=true;else if(c===','){r.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;r.push(f);rows.push(r);r=[];f=''}else f+=c}
+  if(f!==''||r.length){r.push(f);rows.push(r)}return rows}
+function calcItems(text){const rows=parseCsv(text).filter(r=>r.some(x=>String(x).trim()));if(!rows.length)return [];
+  const h=rows[0].map(x=>String(x).trim().toLowerCase());let ci=h.findIndex(x=>/^(bo'?lim|bolim|kategoriya|раздел)/.test(x)),ni=h.findIndex(x=>/^(mahsulot|nomi|name|товар|наименование)/.test(x)),pi=h.findIndex(x=>/^(narx|narxi|price|цена)/.test(x));
+  const hdr=ni>=0&&pi>=0;if(!hdr){ci=0;ni=1;pi=2}
+  return rows.slice(hdr?1:0).map((r,i)=>{const full=String(r[ni]||'').trim().replace(/\s+/g,' ');const price=priceNum(r[pi]);
+    return {key:'c'+i,full,name:full.split(/\s+[—–]\s+/)[0].slice(0,200),cat:ci>=0?String(r[ci]||'').trim().slice(0,60):'',price}}).filter(x=>x.name.length>=2&&x.price>0)}
+// narxnomadagi narx: "1,250" / "1 250,5" / "$1,250.00" / "1.250.000" ham to'g'ri o'qiladi
+function priceNum(v){let t=String(v??'').replace(/[^\d.,-]/g,'');if(!t)return 0;
+  const c=(t.match(/,/g)||[]).length,d=(t.match(/\./g)||[]).length;
+  if(c&&d){t=t.lastIndexOf(',')>t.lastIndexOf('.')?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'')}
+  else if(c){t=(c>1||/^-?\d{1,3}(,\d{3})+$/.test(t))?t.replace(/,/g,''):t.replace(',','.')}
+  else if(d>1||/^-?\d{1,3}(\.\d{3}){2,}$/.test(t)){t=t.replace(/\./g,'')}
+  const x=parseFloat(t);return isFinite(x)?x:0}
+
+/* ---------- ma'lumotlar ---------- */
+function useInit(){P={};for(const p of (INIT&&INIT.products)||[])P[p.id]=p;CL=((INIT&&INIT.clients)||[]).slice();
+  CALC=INIT&&INIT.calcCsv?calcItems(INIT.calcCsv):[];CALC_ST=CALC.length?'ok':INIT&&INIT.calcErr?'err':INIT&&INIT.calcCsv===''?'off':'err'}
+async function loadInit(){
+  const j=await api('init');delete j.ok;
+  if(j.linked&&j.balansErr&&INIT&&INIT.linked){j.products=INIT.products||[];j.clients=INIT.clients||[];j.stale=true}   // balans vaqtincha ochilmadi — oxirgi katalog
+  if(!j.calcCsv&&j.calcErr&&INIT&&INIT.calcCsv){j.calcCsv=INIT.calcCsv;j.calcStale=true}
+  INIT=Object.assign(j,{at:Date.now()});lsSet('hz_init',INIT);useInit();setNet(true)}
+const myOutQty=pid=>OUT.reduce((a,o)=>a+o.lines.filter(l=>l.pid===pid).reduce((b,l)=>b+num(l.qty),0),0);
+const freeOf=pid=>{const p=P[pid];return p?r2(num(p.stock)-num(p.reserved)-myOutQty(pid)):0};
+const prods=()=>Object.values(P).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+const sellers=()=>((INIT&&INIT.sellers)||[]).filter(Boolean);
+
+/* ---------- navbat: internet yo'qligida saqlangan zakazlar ---------- */
+let FLUSHING=null;
+async function flush(){
+  if(FLUSHING)return FLUSHING;
+  FLUSHING=(async()=>{const todo=OUT.filter(o=>!o._err);if(!todo.length||!SET)return;let changed=false;
+    for(const o of todo){try{const p={...o};delete p._label;delete p._err;const r=await api('order',{order:p});OUT=OUT.filter(x=>x.id!==o.id);changed=true;reserve(o,1);setNet(true);toast(`${o._label||'Zakaz'} yuborildi · ${r.order.no}`)}
+      catch(e){if(e.net){setNet(false);break}if(e.auth||e.temp)break;OUT=OUT.map(x=>x.id===o.id?{...x,_err:e.message}:x);changed=true;toast(`Zakaz yuborilmadi: ${e.message}`,true)}}
+    if(changed){lsSet('hz_out',OUT);updPend();if(tab==='today')loadToday(true)}})().finally(()=>{FLUSHING=null});
+  return FLUSHING}
+function reserve(o,k){if(!INIT||!INIT.products)return;for(const l of o.lines)if(l.pid&&P[l.pid])P[l.pid].reserved=r2(num(P[l.pid].reserved)+k*num(l.qty));lsSet('hz_init',INIT)}
+function pendHTML(){return OUT.length?`<div class="pend">Yuborilmagan zakazlar: ${OUT.length} ta — internet qaytganda avtomatik yuboriladi${OUT.some(o=>o._err)?`<br>Xato: ${esc(OUT.find(o=>o._err)._err)} <button class="btn sm" id="retryErr">Qayta yuborish</button> <button class="btn sm" id="dropErr">Xatolilarni o'chirish</button>`:''}</div>`:''}
+function bindPend(){const rt=$('#retryErr');if(rt)rt.onclick=()=>{OUT=OUT.map(o=>{const x={...o};delete x._err;return x});lsSet('hz_out',OUT);updPend();flush()};const d=$('#dropErr');if(d)d.onclick=()=>{if(!confirm("Xato bilan qaytgan zakazlar o'chirilsinmi?"))return;OUT=OUT.filter(o=>!o._err);lsSet('hz_out',OUT);updPend()}}
+function updPend(){const box=$('#pendBox');if(box){box.innerHTML=pendHTML();bindPend()}}
+async function loadToday(quiet){try{const r=await api('list',{date:today()});ORD=r.orders||[];LIST_ERR=r.syncErr?"Hed balans holatini olib bo'lmadi: "+r.syncErr:'';setNet(true);if(tab==='today')render()}
+  catch(e){if(e.net)setNet(false);if(!quiet)toast(e.net?"Internet yo'q":e.message,true)}}
+
+/* ---------- ekranlar ---------- */
+function box(html){$('#root').innerHTML=`<div class="auth"><div class="box">${html}</div></div>`}
+function setupScreen(msg,kind){
+  box(`<b class="muted">Hed zakaz</b><h1>Ulanish</h1><p class="muted" style="margin-top:0">Bu kompyuter uchun bir marta sozlanadi. Faqat PIN ni kiriting.</p>
+   <form id="sf" novalidate><details style="margin-bottom:10px"><summary class="muted" style="cursor:pointer;font-size:12px">Server manzili</summary><label class="field" style="margin-top:6px"><span>Google skript manzili (Web app URL)</span><input type="url" id="sU" value="${esc((SET&&SET.url)||DEF_URL)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false"></label></details>
+   <label class="field"><span>PIN</span><input type="password" id="sP" autocomplete="off"></label>
+   <button class="btn pri" style="width:100%" id="sOk">Ulanish</button></form><div class="msg ${kind||'err'}" id="sMsg">${esc(msg||'')}</div>`);
+  const say=(t,k)=>{const m=$('#sMsg');m.textContent=t;m.className='msg '+(k||'err')};
+  $('#sf').onsubmit=async ev=>{ev.preventDefault();const url=$('#sU').value.trim(),pin=$('#sP').value.trim();
+    if(!/^https?:\/\/\S+$/.test(url))return say("Manzilni to'liq kiriting (https://script.google.com/…/exec)");
+    if(pin.length<4)return say('PIN ni kiriting');
+    $('#sOk').disabled=true;say('Tekshirilmoqda…','');
+    try{const set={url,pin};const j=await api('init',null,set);delete j.ok;SET=set;lsSet('hz_set',SET);INIT=Object.assign(j,{at:Date.now()});lsSet('hz_init',INIT);useInit();setNet(true);boot();flush()}
+    catch(e){say(e.net?"Serverga ulanib bo'lmadi — manzil va internetni tekshiring":e.message)}
+    finally{const b=$('#sOk');if(b)b.disabled=false}};
+  setTimeout(()=>{const i=$('#sP');if(i)i.focus()},0)}
+function sellerScreen(){
+  const s=sellers();
+  box(`<b class="muted">Hed zakaz · ${esc((INIT&&INIT.company)||'')}</b><h1>Sotuvchi kim?</h1><p class="muted" style="margin-top:0">Bu kompyuterda zakazlar shu ism bilan yoziladi. Keyin tepadagi ism ustiga bosib almashtirsa bo'ladi.</p>
+   <div class="sellers">${s.map(x=>`<button class="btn ${x===SELLER?'pri':''}" data-s="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+   <form id="slf"><label class="field"><span>${s.length?"Ro'yxatda yo'q bo'lsa — ismini yozing":'Ismingiz'}</span><input type="text" id="slN" maxlength="60" autocomplete="off" value="${esc(SELLER&&!s.includes(SELLER)?SELLER:'')}"></label><button class="btn ${s.length?'':'pri'}" style="width:100%">Davom etish</button></form>
+   ${SELLER?'<div class="links"><a id="slBack">Ortga</a></div>':''}`);
+  const pick=v=>{v=String(v||'').trim().replace(/\s+/g,' ').slice(0,60);if(v.length<2)return toast('Ismni yozing',true);SELLER=v;lsSet('hz_seller2',SELLER);boot()};
+  $$('[data-s]').forEach(b=>b.onclick=()=>pick(b.dataset.s));
+  $('#slf').onsubmit=ev=>{ev.preventDefault();pick($('#slN').value)};
+  if($('#slBack'))$('#slBack').onclick=()=>boot()}
+function boot(){
+  if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
+  $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed zakaz</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
+     <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
+   <div class="tabs"><button data-tab="new">Yangi zakaz</button><button data-tab="today">Bugungi zakazlar</button></div></header><main id="main"></main><div id="bar"></div>`;
+  $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
+  $('#whoBtn').onclick=sellerScreen;
+  $('#setBtn').onclick=()=>{if(confirm("Ulanish sozlamalari (Google skript manzili va PIN) qayta kiritilsinmi?"))setupScreen()};
+  $$('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();if(tab==='today')loadToday()});
+  setNet(ONLINE);render()}
+function render(){
+  if(!$('#main'))return;
+  $$('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  const pend=`<div id="pendBox">${pendHTML()}</div>`;
+  if(tab==='new')viewNew(pend);else viewToday(pend);
+  bindPend()}
+const stockTxt=(pid,q)=>{const p=P[pid];if(!p)return '';const f=freeOf(pid);return `Ostatka: ${r2(num(p.stock))}${num(p.reserved)||myOutQty(pid)?` · band: ${r2(num(p.reserved)+myOutQty(pid))} · bo'sh: ${f}`:''}${q!=null&&num(q)>f?' <span class="tag warn">yetmaydi</span>':''}`};
+function catInfo(){if(!INIT)return '';const b=linked()?(INIT.balansErr?`<span style="color:var(--bad)">Hed balans ochilmadi${INIT.stale?' — oxirgi ostatka ko\'rsatilmoqda':''}</span> · `:`Balans katalogi (${prods().length}) · `):'';
+  return b+(CALC.length?`HED kalkulyator (${CALC.length} ta)${INIT.calcStale?' · saqlangan nusxa':''}`:CALC_ST==='off'?'Kalkulyator narxnomasi ulanmagan':`<span style="color:var(--bad)">Kalkulyator narxnomasi yuklanmadi${INIT.calcErr?': '+esc(INIT.calcErr):''}</span>`)}
+function viewNew(pend){
+  const debt=F.pay==='debt';const k=F.cid&&CL.find(c=>c.id===F.cid);
+  $('#main').innerHTML=`${pend}<div class="card"><h3>Mijoz va to'lov</h3>
+    <div class="seg"><button data-pay="cash" class="${!debt?'on':''}">Naqd olindi</button><button data-pay="debt" class="${debt?'on':''}">Qarzga</button></div>
+    ${CL.length?`<label class="field"><span>Mijoz (Hed balansdagi ro'yxat)${debt?'':' — ixtiyoriy'}</span><select id="zCid"><option value="">— ro'yxatdan tanlang yoki pastda ismini yozing —</option>${CL.map(c=>`<option value="${esc(c.id)}" ${c.id===F.cid?'selected':''}>${esc(c.name)}${c.phone?' · '+esc(c.phone):''}</option>`).join('')}</select></label>`:''}
+    ${k?'':`<div class="row2"><label class="field"><span>Mijoz ismi${debt?' *':' (ixtiyoriy)'}</span><input type="text" id="zName" value="${esc(F.client)}" placeholder="Masalan: Sobir aka (Chorsu)" autocomplete="off" maxlength="120"></label><label class="field"><span>Telefon</span><input type="tel" id="zPhone" value="${esc(F.phone)}" placeholder="+998" inputmode="tel" maxlength="40"></label></div>`}
+  </div>
+  <div class="card"><h3>Mahsulotlar</h3><input type="search" id="zQ" placeholder="${linked()?'Mahsulot nomi, artikul yoki shtrix-kod':'Mahsulot nomi'}" autocomplete="off"><div id="zRes"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><small class="muted" id="zCat">${catInfo()}</small><button class="btn sm" id="zMan">+ Qo'lda kiritish</button></div>
+    <div class="ltab" id="zLines">${F.lines.length?`<div class="lh"><span class="c-n">Mahsulot nomi</span><span class="c-p">Narx</span><span class="c-q">Soni</span><span class="c-s">Jami</span></div>`+F.lines.map((l,i)=>{const p=P[l.pid];const low=p&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001&&INIT.minPriceCheck!==false;
+      return `<div class="lr"><div class="c-n">${l.pid?`<b>${i+1}. ${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" value="${esc(l.name)}" placeholder="${i+1}. Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi"><small><span class="tag warn">Qo'lda</span></small>`:`<b>${i+1}. ${esc(l.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(l.cat||'')}</small>`}${low?`<small style="display:block;color:var(--bad)">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</div>
+      <div class="c-p"><input type="text" inputmode="decimal" data-pr="${i}" value="${l.price}" aria-label="Narx"></div>
+      <div class="c-q"><div class="qty"><button data-dec="${i}" aria-label="Kamaytirish">−</button><input type="text" inputmode="decimal" data-q="${i}" value="${l.qty}" aria-label="Soni"><button data-inc="${i}" aria-label="Ko'paytirish">+</button></div></div>
+      <div class="c-s"><b data-sum="${i}">${fmt(lineSum(l))}</b></div></div>`}).join('')+`<div class="lf" id="zLf"><span>Jami: ${F.lines.length} xil, ${r2(F.lines.reduce((a,l)=>a+num(l.qty),0))} dona</span><b>${fmt(total())}</b></div>`:'<p class="muted" style="margin:10px 0 2px">Hali mahsulot qo\'shilmagan — yuqoridan qidiring.</p>'}</div></div>
+  <div class="card"><label class="field" style="margin:0"><span>Izoh</span><textarea id="zNote" rows="2" maxlength="500" placeholder="Masalan: ertaga ertalab olib ketadi">${esc(F.note)}</textarea></label></div>`;
+  $('#bar').innerHTML=`<div class="sticky"><div class="in"><div class="sum" id="zSum">${sumHTML()}</div><button class="btn" id="zClr">Tozalash</button><button class="btn pri" id="zSave" ${F.lines.length?'':'disabled'}>Saqlash</button></div></div>`;
+  $$('[data-pay]').forEach(b=>b.onclick=()=>{F.pay=b.dataset.pay;saveDraft();render()});
+  if($('#zCid'))$('#zCid').onchange=e=>{F.cid=e.target.value;saveDraft();render()};
+  if($('#zName')){$('#zName').oninput=e=>{F.client=e.target.value;saveDraft()};$('#zPhone').oninput=e=>{F.phone=e.target.value;saveDraft()}}
+  $('#zNote').oninput=e=>{F.note=e.target.value;saveDraft()};
+  const q=$('#zQ');q.oninput=()=>{const raw=q.value.trim(),t=raw.toLowerCase();const bx=$('#zRes');if(!t){bx.innerHTML='';return}
+    const words=t.split(/\s+/);const has=s=>{s=String(s).toLowerCase();return words.every(w=>s.includes(w))};
+    const hits=prods().filter(p=>has(p.name+' '+(p.sku||'')+' '+(p.barcode||'')+' '+(p.brand||''))).slice(0,30);
+    const own=new Set(prods().map(p=>norm(p.name)));
+    const ch=CALC.filter(c=>!own.has(norm(c.name))&&has(c.full+' '+c.cat)).slice(0,Math.max(0,30-hits.length));
+    bx.innerHTML=`<div class="res">${hits.map(p=>`<div class="item" data-add="${esc(p.id)}"><div class="nm"><b>${esc(p.name)}</b><small>${p.sku?esc(p.sku)+' · ':''}${stockTxt(p.id)}</small></div><b>${fmt(num(p.price))}</b></div>`).join('')}
+      ${ch.map(c=>`<div class="item" data-calc="${esc(c.key)}"><div class="nm"><b>${esc(c.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(c.cat)}</small></div><b>${fmt(c.price)}</b></div>`).join('')}
+      <div class="item" data-manual="1"><div class="nm"><b>+ «${esc(raw)}» — qo'lda qo'shish</b><small>${hits.length+ch.length?"Ro'yxatda yo'q bo'lsa":'Topilmadi'} · nomi va narxini o'zingiz yozasiz</small></div></div></div>`;
+    $$('[data-add]',bx).forEach(x=>x.onclick=()=>{addLine(x.dataset.add);const nq=$('#zQ');if(nq)nq.focus()});
+    $$('[data-calc]',bx).forEach(x=>x.onclick=()=>{addCalc(x.dataset.calc);const nq=$('#zQ');if(nq)nq.focus()});
+    $$('[data-manual]',bx).forEach(x=>x.onclick=()=>addManual(raw))};
+  $('#zMan').onclick=()=>addManual('');
+  q.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const t=q.value.trim().toLowerCase();if(!t)return;const ex=prods().find(p=>(p.barcode&&String(p.barcode).toLowerCase()===t)||(p.sku&&String(p.sku).toLowerCase()===t));const first=$('#zRes [data-add], #zRes [data-calc]');if(ex)addLine(ex.id);else if(first&&first.dataset.add)addLine(first.dataset.add);else if(first)addCalc(first.dataset.calc);else return;const nq=$('#zQ');if(nq)nq.focus()}};
+  $$('[data-nm]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.nm].name=x.value.trim().replace(/\s+/g,' ');saveDraft()});
+  $$('[data-inc]').forEach(b=>b.onclick=()=>{const l=F.lines[+b.dataset.inc];l.qty=r2(num(l.qty)+1);saveDraft();render()});
+  $$('[data-dec]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dec,l=F.lines[i];l.qty=r2(num(l.qty)-1);if(l.qty<=0)F.lines.splice(i,1);saveDraft();render()});
+  $$('[data-q]').forEach(x=>x.onchange=()=>{const i=+x.dataset.q;const v=num(x.value);if(v<=0){F.lines.splice(i,1);saveDraft();render();return}F.lines[i].qty=v;saveDraft();updTotals()});
+  $$('[data-pr]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.pr].price=Math.max(0,num(x.value));saveDraft();updTotals()});
+  $('#zClr').onclick=()=>{if(F.lines.length&&!confirm('Zakaz tozalansinmi?'))return;F=blank();saveDraft();render()};
+  $('#zSave').onclick=save}
+function sumHTML(){return `<small class="muted">${F.lines.length} ta mahsulot · ${F.pay==='debt'?'qarzga':'naqd'}</small><b>${fmt(total())}</b><small class="muted">${uzs(total())}</small>`}
+function updTotals(){ // narx/son o'zgarganda butun sahifani qayta chizmasdan jamilarni yangilash
+  F.lines.forEach((l,i)=>{const e=$(`[data-sum="${i}"]`);if(e)e.textContent=fmt(lineSum(l));const q=$(`[data-q="${i}"]`);if(q&&document.activeElement!==q)q.value=l.qty;
+    const s=$(`[data-st="${i}"]`);if(s&&P[l.pid])s.innerHTML=stockTxt(l.pid,l.qty)});
+  const lf=$('#zLf');if(lf)lf.innerHTML=`<span>Jami: ${F.lines.length} xil, ${r2(F.lines.reduce((a,l)=>a+num(l.qty),0))} dona</span><b>${fmt(total())}</b>`;
+  const sm=$('#zSum');if(sm)sm.innerHTML=sumHTML()}
+function addCalc(key){const c=CALC.find(x=>x.key===key);if(!c)return;const ex=F.lines.find(l=>!l.pid&&l.src==='calc'&&norm(l.name)===norm(c.name));
+  if(ex)ex.qty=r2(num(ex.qty)+1);else F.lines.push({src:'calc',cat:c.cat,name:c.name,qty:1,price:c.price});saveDraft();render();toast(c.name+' qo\'shildi')}
+function addManual(name){F.lines.push({src:'manual',name:name,qty:1,price:0});saveDraft();render();const i=F.lines.length-1;setTimeout(()=>{const el=$(name?`[data-pr="${i}"]`:`[data-nm="${i}"]`);if(el){el.focus();if(el.select)el.select()}},30)}
+function addLine(pid){const p=P[pid];if(!p)return;const ex=F.lines.find(l=>l.pid===pid);if(ex)ex.qty=r2(num(ex.qty)+1);else F.lines.push({pid,unit:p.unit||'dona',name:p.name,qty:1,price:num(p.price)});saveDraft();render();toast(p.name+' qo\'shildi')}
+let saving=false;
+async function save(){
+  if(saving)return;
+  const a=document.activeElement;if(a&&a.matches&&a.matches('[data-q],[data-pr],[data-nm]'))a.dispatchEvent(new Event('change'));   // oxirgi yozilgan son/narx ham hisobga olinsin
+  if(!F.lines.length)return toast("Mahsulot qo'shing",true);
+  const name=String(F.client||'').trim().replace(/\s+/g,' ');const k=F.cid&&CL.find(c=>c.id===F.cid);
+  if(F.pay==='debt'&&!k&&!name)return toast("Qarzga berilganda mijozni tanlang yoki ismini yozing",true);
+  for(const l of F.lines){const nm=String(l.name||'').trim();
+    if(!l.pid&&nm.length<2)return toast("Qo'lda qo'shilgan mahsulot nomini yozing",true);
+    if(!(num(l.price)>0))return toast(`"${nm}" narxini kiriting`,true);
+    const p=P[l.pid];const frac=p&&/^(kg|litr|metr|m)$/i.test(p.unit||'');
+    if(!frac&&!Number.isInteger(num(l.qty)))return toast(`"${nm}" soni butun son bo'lishi kerak`,true);
+    if(p&&INIT.minPriceCheck!==false&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001)return toast(`"${p.name}" minimal narxdan (${fmt(p.minPrice)}) arzon bo'lmaydi`,true)}
+  saving=true;$('#zSave').disabled=true;
+  if(!F.id){F.id=uid();saveDraft()}   // bitta qoralama — bitta id: xatodan keyin qayta bosilsa takror zakaz bo'lmaydi
+  const o={id:F.id,date:today(),seller:SELLER,pay:F.pay,cid:k?k.id:'',client:k?k.name:name,phone:k?(k.phone||''):String(F.phone||'').trim(),note:String(F.note||'').trim(),
+    lines:F.lines.map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',src:'balans',name:String(l.name).trim(),qty:num(l.qty),price:num(l.price)}:{src:l.src,cat:l.cat||'',name:String(l.name).trim().replace(/\s+/g,' '),qty:num(l.qty),price:num(l.price)})};
+  const label=(o.client||'Naqd mijoz')+' · '+fmt(total());
+  try{
+    let done={...o,no:'',total:total(),time:hmNow(),lines:o.lines.map(l=>({...l,sum:lineSum(l)}))};
+    try{const r=await api('order',{order:o});reserve(o,1);setNet(true);done.no=r.order.no;done.total=r.order.total;toast(`Zakaz ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
+    catch(e){if(!e.net&&!e.temp)throw e;OUT=OUT.filter(x=>x.id!==o.id);OUT.push({...o,_label:label});lsSet('hz_out',OUT);if(e.net)setNet(false);toast(e.net?"Internet yo'q — zakaz kompyuterda saqlandi, aloqa tiklanganda yuboriladi":"Server band — zakaz kompyuterda saqlandi, birozdan keyin o'zi yuboriladi")}
+    F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(done)}
+  catch(e){toast(e.message,true);if(e.auth)setTimeout(()=>setupScreen(e.message),1500)}
+  finally{saving=false;const b=$('#zSave');if(b)b.disabled=!F.lines.length}}
+/* ---------- mijoz uchun zakaz varaqasi (PDF): tagida sotuvchi ismi va do'kon muhri (muhr.png) ---------- */
+const hmNow=()=>{try{return new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})}catch(e){return ''}};
+function orderDocHTML(o){
+  const d=String(o.date||today()).split('-').reverse().join('.');const ls=o.lines||[];
+  const td='padding:9px 10px;border-bottom:1px solid #D7DAE0;vertical-align:top';
+  return `<div style="width:794px;box-sizing:border-box;padding:56px 56px 48px;background:#fff;color:#2B2F35;font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #3A3F47;padding-bottom:14px">
+     <div><div style="font-size:24px;font-weight:800;letter-spacing:.2px">${esc((INIT&&INIT.company)||'')}</div><div style="color:#6B7178;margin-top:2px">Mijoz uchun zakaz varaqasi</div></div>
+     <div style="text-align:right"><div style="font-size:18px;font-weight:700">Zakaz ${o.no?'№ '+esc(o.no):''}</div><div style="color:#6B7178">${d}${o.time?' · '+esc(o.time):''}</div></div></div>
+   <table style="margin:18px 0 6px;border-collapse:collapse;font-size:14px"><tr><td style="padding:3px 18px 3px 0;color:#6B7178">Mijoz</td><td style="padding:3px 0;font-weight:600">${esc(o.client||'Naqd mijoz')}</td></tr>
+     ${o.phone?`<tr><td style="padding:3px 18px 3px 0;color:#6B7178">Telefon</td><td style="padding:3px 0">${esc(o.phone)}</td></tr>`:''}
+     <tr><td style="padding:3px 18px 3px 0;color:#6B7178">To'lov</td><td style="padding:3px 0">${o.pay==='debt'?'Qarzga':'Naqd'}</td></tr></table>
+   <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px">
+     <thead><tr style="background:#F2F3F5;text-align:left"><th style="${td};width:34px">№</th><th style="${td}">Mahsulot</th><th style="${td};text-align:right;width:100px">Narxi</th><th style="${td};text-align:center;width:60px">Soni</th><th style="${td};text-align:right;width:110px">Jami</th></tr></thead>
+     <tbody>${ls.map((l,i)=>`<tr><td style="${td}">${i+1}</td><td style="${td}">${esc(l.name)}</td><td style="${td};text-align:right">${fmt(num(l.price))}</td><td style="${td};text-align:center">${esc(l.qty)}</td><td style="${td};text-align:right">${fmt(num(l.sum!=null?l.sum:r2(num(l.qty)*num(l.price))))}</td></tr>`).join('')}</tbody>
+     <tfoot><tr><td colspan="4" style="padding:12px 10px;text-align:right;font-weight:700;font-size:16px">Jami:</td><td style="padding:12px 10px;text-align:right;font-weight:800;font-size:16px">${fmt(num(o.total))}</td></tr></tfoot></table>
+   ${o.note?`<div style="margin-top:10px;color:#3A3F47"><span style="color:#6B7178">Izoh:</span> ${esc(o.note)}</div>`:''}
+   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:64px">
+     <div><div style="color:#6B7178;font-size:13px">Sotuvchi</div><div style="font-size:16px;font-weight:700;margin-top:4px">${esc(o.seller||SELLER||'')}</div><div style="margin-top:28px;border-top:1px solid #6B7178;width:220px;padding-top:4px;color:#6B7178;font-size:12px">imzo</div></div>
+     <div style="position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center"><span style="color:#B9BEC5;font-size:12px">M.O'.</span><img src="muhr.png" alt="" onerror="this.remove()" style="position:absolute;inset:0;width:170px;height:170px;object-fit:contain;transform:rotate(-8deg);opacity:.92"></div></div>
+  </div>`}
+const loadJs=src=>new Promise((ok,no)=>{if(document.querySelector(`script[src="${src}"]`)){const t=setInterval(()=>{if(window.jspdf&&window.html2canvas){clearInterval(t);ok()}},50);setTimeout(()=>{clearInterval(t);ok()},8000);return}const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('kutubxona yuklanmadi'));document.head.appendChild(s)});
+async function orderPdf(o){
+  await loadJs('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  await loadJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1';box.innerHTML=orderDocHTML(o);document.body.appendChild(box);
+  try{
+    await Promise.all([...box.querySelectorAll('img')].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r})));
+    const cv=await window.html2canvas(box.firstElementChild,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    const pdf=new window.jspdf.jsPDF({unit:'pt',format:'a4'});const W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
+    const pageH=Math.floor(cv.width*H/W);
+    for(let y=0,p=0;y<cv.height-8;y+=pageH,p++){const c=document.createElement('canvas');c.width=cv.width;c.height=Math.min(pageH,cv.height-y);c.getContext('2d').drawImage(cv,0,y,cv.width,c.height,0,0,cv.width,c.height);
+      if(p)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,c.height*W/cv.width)}
+    pdf.save(`Zakaz_${(o.no||'yangi').replace(/[^\w-]+/g,'_')}${o.client?'_'+String(o.client).replace(/[^\wА-Яа-яЎўҚқҒғҲҳ'-]+/g,'_').slice(0,30):''}.pdf`)}
+  finally{box.remove()}}
+function orderPrint(o){const w=window.open('','_blank');if(!w){toast("Brauzer yangi oyna ochishga ruxsat bermadi",true);return}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Zakaz ${esc(o.no||'')}</title><base href="${esc(location.href)}"><style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${orderDocHTML(o)}<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
+function pdfModal(o){
+  const ov=document.createElement('div');ov.className='ov';ov.innerHTML=`<div class="sheet"><h3 style="margin:0 0 6px">${o.no?'Zakaz '+esc(o.no)+' saqlandi':'Zakaz saqlandi'}</h3><p class="muted" style="margin:0 0 14px">${esc(o.client||'Naqd mijoz')} · ${fmt(num(o.total))}${o.no?'':' · raqam internet qaytganda beriladi'}</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn pri" id="pdfDl">PDF yuklab olish</button><button class="btn" id="pdfPr">Chop etish</button><button class="btn" id="pdfX">Yopish</button></div></div>`;
+  document.body.appendChild(ov);const close=()=>{ov.remove();const nq=$('#zQ');if(nq)nq.focus()};
+  ov.onclick=e=>{if(e.target===ov)close()};$('#pdfX',ov).onclick=close;
+  $('#pdfPr',ov).onclick=()=>orderPrint(o);
+  $('#pdfDl',ov).onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Tayyorlanmoqda…';try{await orderPdf(o);close()}catch(err){toast("PDF tayyorlanmadi — «Chop etish» → «PDF sifatida saqlash» ni tanlang",true);b.disabled=false;b.textContent='PDF yuklab olish'}}}
+function viewToday(pend){
+  $('#bar').innerHTML='';
+  const all=ORD.slice().reverse();const base=MINE?all.filter(o=>o.seller===SELLER):all;
+  const act=base.filter(o=>o.status!=='cancelled');const cash=act.filter(o=>o.pay==='cash').reduce((a,o)=>a+num(o.total),0),debt=act.filter(o=>o.pay==='debt').reduce((a,o)=>a+num(o.total),0);
+  const nWait=act.filter(o=>!o.delivered).length,nDone=act.filter(o=>o.delivered).length;
+  const L=base.filter(o=>DF==='all'||(DF==='wait'?o.status!=='cancelled'&&!o.delivered:o.status!=='cancelled'&&o.delivered));
+  $('#main').innerHTML=`${pend}${LIST_ERR?`<div class="pend">${esc(LIST_ERR)}</div>`:''}<div class="seg" style="margin-bottom:10px"><button data-mine="1" class="${MINE?'on':''}">Meniki (${esc(SELLER)})</button><button data-mine="0" class="${!MINE?'on':''}">Hamma sotuvchilar</button></div>
+   <div class="stats"><div><small>Zakazlar</small><b>${act.length}</b></div><div><small>Naqd olindi</small><b>${fmt(cash)}</b></div><div><small>Qarzga</small><b>${fmt(debt)}</b></div></div>
+   <div class="seg" style="margin-bottom:12px"><button data-df="all" class="${DF==='all'?'on':''}">Hammasi</button><button data-df="wait" class="${DF==='wait'?'on':''}">Berilmagan (${nWait})</button><button data-df="done" class="${DF==='done'?'on':''}">Chiqarildi (${nDone})</button></div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0">Bugun, ${today().split('-').reverse().join('.')}</h3><button class="btn sm" id="zRef">Yangilash</button></div>
+   ${linked()?`<p class="hint" style="margin:0 0 6px">Zakaz Hed balansda sotuvga aylantirilganda o'zi «Chiqarildi» bo'ladi.</p>`:''}
+   <div class="list">${L.length?L.map(o=>{const c=o.status==='cancelled';const sale=/^Sotuv /.test(o.balans||'')?o.balans:'';return `<div class="item" style="align-items:flex-start"><div class="nm"><b>${esc(o.no)} · ${esc(o.client||'Naqd mijoz')}</b><small>${esc(o.time||'')}${o.seller?' · '+esc(o.seller):''} · ${o.lines.length} ta mahsulot${o.note?' · '+esc(o.note):''}</small>
+     <small style="display:block">${o.lines.map(l=>esc(l.name)+' × '+l.qty).join(', ')}</small>
+     ${!c?(o.delivered?`<small style="display:block;margin-top:4px"><span class="tag ok">✓ Chiqarildi</span>${sale?' '+esc(sale):''}</small>`:`<small style="display:block;margin-top:4px"><span class="tag warn">Hali berilmagan</span>${o.balans==='Kutilmoqda'?' <span class="tag">balansga yuborilmoqda</span>':/^Xato/.test(o.balans||'')?' <span class="tag bad">'+esc(o.balans)+'</span>':''}</small>`):''}</div>
+     <div style="text-align:right;flex:none"><b ${c?'style="text-decoration:line-through"':''}>${fmt(o.total)}</b><br>${c?'<span class="tag bad">Bekor</span>':o.pay==='debt'?'<span class="tag warn">Qarzga</span>':'<span class="tag ok">Naqd</span>'}
+     ${c?'':`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun zakaz varaqasi (PDF)">PDF</button>`}
+     ${c?'':o.delivered?(linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`):`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda zakaz yo'q.":"Bugun hali zakaz yo'q."}</p>`}</div></div>`;
+  $('#zRef').onclick=()=>loadToday();
+  $$('[data-mine]').forEach(b=>b.onclick=()=>{MINE=b.dataset.mine==='1';render()});
+  $$('[data-df]').forEach(b=>b.onclick=()=>{DF=b.dataset.df;render()});
+  $$('[data-pdf]').forEach(b=>b.onclick=()=>{const o=ORD.find(x=>x.id===b.dataset.pdf);if(o)pdfModal(o)});
+  const upd=r=>{const i=ORD.findIndex(x=>x.id===r.order.id);if(i>=0)ORD[i]=r.order;render()};
+  const setDel=async(id,on)=>{try{const r=await api('deliver',{id,on});upd(r);toast(on?`${r.order.no} — chiqarildi`:`${r.order.no} — berilmagan`)}catch(e){toast(e.net?"Internet yo'q — keyinroq belgilang":e.message,true)}};
+  $$('[data-del]').forEach(b=>b.onclick=()=>setDel(b.dataset.del,true));
+  $$('[data-undel]').forEach(b=>b.onclick=()=>{if(confirm('Zakaz «hali berilmagan» deb qaytarilsinmi?'))setDel(b.dataset.undel,false)});
+  $$('[data-cancel]').forEach(b=>b.onclick=async()=>{const o=ORD.find(x=>x.id===b.dataset.cancel);const why=prompt(`${o.no} zakazi bekor qilinsinmi? Sababi (ixtiyoriy):`,'');if(why===null)return;
+    try{const r=await api('cancel',{id:o.id,note:why});upd(r);if(o.status!=='cancelled')reserve(o,-1);toast('Zakaz bekor qilindi')}catch(e){toast(e.net?"Internet yo'q — keyinroq urinib ko'ring":e.message,true)}})}
+
+/* ---------- ishga tushirish ---------- */
+function busyInput(){const a=document.activeElement;return !!(a&&a.closest&&a.closest('#main')&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))}
+let LOOPS=false;
+function loops(){if(LOOPS)return;LOOPS=true;
+  setInterval(()=>{if(!document.hidden&&OUT.length)flush()},30000);
+  setInterval(()=>{if(!document.hidden&&SET)refresh()},10*60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&SET){flush();if(INIT&&Date.now()-INIT.at>5*60000)refresh()}});
+  addEventListener('online',()=>{if(SET){flush();refresh()}});addEventListener('offline',()=>setNet(false))}
+async function refresh(){try{await loadInit();const c=$('#zCat');if(c)c.innerHTML=catInfo();if(tab==='new'&&!busyInput()&&$('#zQ')&&!$('#zQ').value)render();else if(tab==='new')updTotals()}
+  catch(e){if(e.net)setNet(false);else if(e.auth)setupScreen(e.message)}}
+async function start(){
+  loops();
+  if(!SET)return setupScreen();
+  if(INIT){useInit();boot();refresh();flush();return}
+  box('<h1>Hed zakaz</h1><p class="muted">Yuklanmoqda…</p>');
+  try{await loadInit();boot();flush()}catch(e){if(e.auth)return setupScreen(e.message);box(`<h1>Serverga ulanib bo'lmadi</h1><p class="muted">${esc(e.net?"Internet aloqasini tekshirib, sahifani yangilang.":e.message)}</p><button class="btn pri" onclick="location.reload()">Qayta urinish</button> <button class="btn" id="reSet">Ulanishni o'zgartirish</button>`);$('#reSet').onclick=()=>setupScreen()}}
+start();
+if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
