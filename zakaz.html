@@ -395,12 +395,14 @@ function viewToday(pend){
      <small style="display:block">${o.lines.map(l=>esc(l.name)+' × '+l.qty).join(', ')}</small>
      ${!c?(o.delivered?`<small style="display:block;margin-top:4px"><span class="tag ok">✓ Chiqarildi</span>${sale?' '+esc(sale):''}</small>`:`<small style="display:block;margin-top:4px"><span class="tag warn">Hali berilmagan</span>${o.balans==='Kutilmoqda'?' <span class="tag">balansga yuborilmoqda</span>':/^Xato/.test(o.balans||'')?' <span class="tag bad">'+esc(o.balans)+'</span>':''}</small>`):''}</div>
      <div style="text-align:right;flex:none"><b ${c?'style="text-decoration:line-through"':''}>${fmt(o.total)}</b><br>${c?'<span class="tag bad">Bekor</span>':o.pay==='debt'?'<span class="tag warn">Qarzga</span>':'<span class="tag ok">Naqd</span>'}
-     ${c?'':`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun zakaz varaqasi (PDF)">PDF</button>`}
+     ${c?`<br><button class="btn sm" style="margin-top:6px;color:var(--bad)" data-rm="${esc(o.id)}" title="Jadvaldan butunlay o'chirish">O'chirish</button>`:`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun zakaz varaqasi (PDF)">PDF</button>`}
      ${c?'':o.delivered?(linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`):`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda zakaz yo'q.":"Bugun hali zakaz yo'q."}</p>`}</div></div>`;
   $('#zRef').onclick=()=>loadToday();
   $$('[data-mine]').forEach(b=>b.onclick=()=>{MINE=b.dataset.mine==='1';render()});
   $$('[data-df]').forEach(b=>b.onclick=()=>{DF=b.dataset.df;render()});
   $$('[data-pdf]').forEach(b=>b.onclick=()=>{const o=ORD.find(x=>x.id===b.dataset.pdf);if(o)pdfModal(o)});
+  $$('[data-rm]').forEach(b=>b.onclick=async()=>{const o=ORD.find(x=>x.id===b.dataset.rm);if(!o||!confirm(`Bekor qilingan ${o.no} zakazi jadvaldan butunlay o'chirilsinmi? Qaytarib bo'lmaydi.`))return;b.disabled=true;
+    try{await api('remove',{id:o.id});ORD=ORD.filter(x=>x.id!==o.id);if(F.edit&&F.id===o.id){F=blank();saveDraft()}render();toast(`${o.no} o'chirildi`)}catch(e){b.disabled=false;toast(e.net?"Internet yo'q — keyinroq urinib ko'ring":e.message,true)}});
   $$('[data-edit]').forEach(b=>b.onclick=()=>{const o=ORD.find(x=>x.id===b.dataset.edit);if(!o)return;
     if(F.lines.length&&!(F.edit&&F.id===o.id)&&!confirm(F.edit?`Zakaz ${F.edit.no} dagi saqlanmagan o'zgarishlar o'chadi. Davom etilsinmi?`:"Yozilayotgan yangi zakaz o'chadi. Davom etilsinmi?"))return;
     F={pay:o.pay==='debt'?'debt':'cash',cid:'',client:o.client==='Naqd mijoz'?'':(o.client||''),phone:o.phone||'',note:o.note||'',id:o.id,edit:{no:o.no,date:o.date,time:o.time,seller:o.seller},
