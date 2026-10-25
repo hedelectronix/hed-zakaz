@@ -320,11 +320,56 @@ async function save(){
     lines:F.lines.map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',src:'balans',name:String(l.name).trim(),qty:num(l.qty),price:num(l.price)}:{src:l.src,cat:l.cat||'',name:String(l.name).trim().replace(/\s+/g,' '),qty:num(l.qty),price:num(l.price)})};
   const label=(o.client||'Naqd mijoz')+' · '+fmt(total());
   try{
-    try{const r=await api('order',{order:o});reserve(o,1);setNet(true);toast(`Zakaz ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
+    let done={...o,no:'',total:total(),time:hmNow(),lines:o.lines.map(l=>({...l,sum:lineSum(l)}))};
+    try{const r=await api('order',{order:o});reserve(o,1);setNet(true);done.no=r.order.no;done.total=r.order.total;toast(`Zakaz ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
     catch(e){if(!e.net&&!e.temp)throw e;OUT=OUT.filter(x=>x.id!==o.id);OUT.push({...o,_label:label});lsSet('hz_out',OUT);if(e.net)setNet(false);toast(e.net?"Internet yo'q — zakaz kompyuterda saqlandi, aloqa tiklanganda yuboriladi":"Server band — zakaz kompyuterda saqlandi, birozdan keyin o'zi yuboriladi")}
-    F=blank();saveDraft();render();window.scrollTo(0,0);const nq=$('#zQ');if(nq)nq.focus()}
+    F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(done)}
   catch(e){toast(e.message,true);if(e.auth)setTimeout(()=>setupScreen(e.message),1500)}
   finally{saving=false;const b=$('#zSave');if(b)b.disabled=!F.lines.length}}
+/* ---------- mijoz uchun zakaz varaqasi (PDF): tagida sotuvchi ismi va do'kon muhri (muhr.png) ---------- */
+const hmNow=()=>{try{return new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})}catch(e){return ''}};
+function orderDocHTML(o){
+  const d=String(o.date||today()).split('-').reverse().join('.');const ls=o.lines||[];
+  const td='padding:9px 10px;border-bottom:1px solid #D7DAE0;vertical-align:top';
+  return `<div style="width:794px;box-sizing:border-box;padding:56px 56px 48px;background:#fff;color:#2B2F35;font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #3A3F47;padding-bottom:14px">
+     <div><div style="font-size:24px;font-weight:800;letter-spacing:.2px">${esc((INIT&&INIT.company)||'')}</div><div style="color:#6B7178;margin-top:2px">Mijoz uchun zakaz varaqasi</div></div>
+     <div style="text-align:right"><div style="font-size:18px;font-weight:700">Zakaz ${o.no?'№ '+esc(o.no):''}</div><div style="color:#6B7178">${d}${o.time?' · '+esc(o.time):''}</div></div></div>
+   <table style="margin:18px 0 6px;border-collapse:collapse;font-size:14px"><tr><td style="padding:3px 18px 3px 0;color:#6B7178">Mijoz</td><td style="padding:3px 0;font-weight:600">${esc(o.client||'Naqd mijoz')}</td></tr>
+     ${o.phone?`<tr><td style="padding:3px 18px 3px 0;color:#6B7178">Telefon</td><td style="padding:3px 0">${esc(o.phone)}</td></tr>`:''}
+     <tr><td style="padding:3px 18px 3px 0;color:#6B7178">To'lov</td><td style="padding:3px 0">${o.pay==='debt'?'Qarzga':'Naqd'}</td></tr></table>
+   <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px">
+     <thead><tr style="background:#F2F3F5;text-align:left"><th style="${td};width:34px">№</th><th style="${td}">Mahsulot</th><th style="${td};text-align:right;width:100px">Narxi</th><th style="${td};text-align:center;width:60px">Soni</th><th style="${td};text-align:right;width:110px">Jami</th></tr></thead>
+     <tbody>${ls.map((l,i)=>`<tr><td style="${td}">${i+1}</td><td style="${td}">${esc(l.name)}</td><td style="${td};text-align:right">${fmt(num(l.price))}</td><td style="${td};text-align:center">${esc(l.qty)}</td><td style="${td};text-align:right">${fmt(num(l.sum!=null?l.sum:r2(num(l.qty)*num(l.price))))}</td></tr>`).join('')}</tbody>
+     <tfoot><tr><td colspan="4" style="padding:12px 10px;text-align:right;font-weight:700;font-size:16px">Jami:</td><td style="padding:12px 10px;text-align:right;font-weight:800;font-size:16px">${fmt(num(o.total))}</td></tr></tfoot></table>
+   ${o.note?`<div style="margin-top:10px;color:#3A3F47"><span style="color:#6B7178">Izoh:</span> ${esc(o.note)}</div>`:''}
+   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:64px">
+     <div><div style="color:#6B7178;font-size:13px">Sotuvchi</div><div style="font-size:16px;font-weight:700;margin-top:4px">${esc(o.seller||SELLER||'')}</div><div style="margin-top:28px;border-top:1px solid #6B7178;width:220px;padding-top:4px;color:#6B7178;font-size:12px">imzo</div></div>
+     <div style="position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center"><span style="color:#B9BEC5;font-size:12px">M.O'.</span><img src="muhr.png" alt="" onerror="this.remove()" style="position:absolute;inset:0;width:170px;height:170px;object-fit:contain;transform:rotate(-8deg);opacity:.92"></div></div>
+  </div>`}
+const loadJs=src=>new Promise((ok,no)=>{if(document.querySelector(`script[src="${src}"]`)){const t=setInterval(()=>{if(window.jspdf&&window.html2canvas){clearInterval(t);ok()}},50);setTimeout(()=>{clearInterval(t);ok()},8000);return}const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('kutubxona yuklanmadi'));document.head.appendChild(s)});
+async function orderPdf(o){
+  await loadJs('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  await loadJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1';box.innerHTML=orderDocHTML(o);document.body.appendChild(box);
+  try{
+    await Promise.all([...box.querySelectorAll('img')].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r})));
+    const cv=await window.html2canvas(box.firstElementChild,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    const pdf=new window.jspdf.jsPDF({unit:'pt',format:'a4'});const W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
+    const pageH=Math.floor(cv.width*H/W);
+    for(let y=0,p=0;y<cv.height-8;y+=pageH,p++){const c=document.createElement('canvas');c.width=cv.width;c.height=Math.min(pageH,cv.height-y);c.getContext('2d').drawImage(cv,0,y,cv.width,c.height,0,0,cv.width,c.height);
+      if(p)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,c.height*W/cv.width)}
+    pdf.save(`Zakaz_${(o.no||'yangi').replace(/[^\w-]+/g,'_')}${o.client?'_'+String(o.client).replace(/[^\wА-Яа-яЎўҚқҒғҲҳ'-]+/g,'_').slice(0,30):''}.pdf`)}
+  finally{box.remove()}}
+function orderPrint(o){const w=window.open('','_blank');if(!w){toast("Brauzer yangi oyna ochishga ruxsat bermadi",true);return}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Zakaz ${esc(o.no||'')}</title><base href="${esc(location.href)}"><style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${orderDocHTML(o)}<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
+function pdfModal(o){
+  const ov=document.createElement('div');ov.className='ov';ov.innerHTML=`<div class="sheet"><h3 style="margin:0 0 6px">${o.no?'Zakaz '+esc(o.no)+' saqlandi':'Zakaz saqlandi'}</h3><p class="muted" style="margin:0 0 14px">${esc(o.client||'Naqd mijoz')} · ${fmt(num(o.total))}${o.no?'':' · raqam internet qaytganda beriladi'}</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn pri" id="pdfDl">PDF yuklab olish</button><button class="btn" id="pdfPr">Chop etish</button><button class="btn" id="pdfX">Yopish</button></div></div>`;
+  document.body.appendChild(ov);const close=()=>{ov.remove();const nq=$('#zQ');if(nq)nq.focus()};
+  ov.onclick=e=>{if(e.target===ov)close()};$('#pdfX',ov).onclick=close;
+  $('#pdfPr',ov).onclick=()=>orderPrint(o);
+  $('#pdfDl',ov).onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Tayyorlanmoqda…';try{await orderPdf(o);close()}catch(err){toast("PDF tayyorlanmadi — «Chop etish» → «PDF sifatida saqlash» ni tanlang",true);b.disabled=false;b.textContent='PDF yuklab olish'}}}
 function viewToday(pend){
   $('#bar').innerHTML='';
   const all=ORD.slice().reverse();const base=MINE?all.filter(o=>o.seller===SELLER):all;
@@ -340,10 +385,12 @@ function viewToday(pend){
      <small style="display:block">${o.lines.map(l=>esc(l.name)+' × '+l.qty).join(', ')}</small>
      ${!c?(o.delivered?`<small style="display:block;margin-top:4px"><span class="tag ok">✓ Chiqarildi</span>${sale?' '+esc(sale):''}</small>`:`<small style="display:block;margin-top:4px"><span class="tag warn">Hali berilmagan</span>${o.balans==='Kutilmoqda'?' <span class="tag">balansga yuborilmoqda</span>':/^Xato/.test(o.balans||'')?' <span class="tag bad">'+esc(o.balans)+'</span>':''}</small>`):''}</div>
      <div style="text-align:right;flex:none"><b ${c?'style="text-decoration:line-through"':''}>${fmt(o.total)}</b><br>${c?'<span class="tag bad">Bekor</span>':o.pay==='debt'?'<span class="tag warn">Qarzga</span>':'<span class="tag ok">Naqd</span>'}
+     ${c?'':`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun zakaz varaqasi (PDF)">PDF</button>`}
      ${c?'':o.delivered?(linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`):`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda zakaz yo'q.":"Bugun hali zakaz yo'q."}</p>`}</div></div>`;
   $('#zRef').onclick=()=>loadToday();
   $$('[data-mine]').forEach(b=>b.onclick=()=>{MINE=b.dataset.mine==='1';render()});
   $$('[data-df]').forEach(b=>b.onclick=()=>{DF=b.dataset.df;render()});
+  $$('[data-pdf]').forEach(b=>b.onclick=()=>{const o=ORD.find(x=>x.id===b.dataset.pdf);if(o)pdfModal(o)});
   const upd=r=>{const i=ORD.findIndex(x=>x.id===r.order.id);if(i>=0)ORD[i]=r.order;render()};
   const setDel=async(id,on)=>{try{const r=await api('deliver',{id,on});upd(r);toast(on?`${r.order.no} — chiqarildi`:`${r.order.no} — berilmagan`)}catch(e){toast(e.net?"Internet yo'q — keyinroq belgilang":e.message,true)}};
   $$('[data-del]').forEach(b=>b.onclick=()=>setDel(b.dataset.del,true));
