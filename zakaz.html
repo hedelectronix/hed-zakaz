@@ -88,6 +88,7 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .res{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:var(--panel)}
 .res .item{padding:10px 10px;cursor:pointer}
 .res .item:hover{background:var(--soft)}
+.res .item.sel{background:var(--soft);box-shadow:inset 3px 0 0 var(--acc)}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
 .stats div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
 .stats small{display:block;color:var(--ink2);font-size:12px}.stats b{font-size:16px;overflow-wrap:anywhere}
@@ -285,7 +286,21 @@ function viewNew(pend){
     $$('[data-calc]',bx).forEach(x=>x.onclick=()=>{addCalc(x.dataset.calc);const nq=$('#zQ');if(nq)nq.focus()});
     $$('[data-manual]',bx).forEach(x=>x.onclick=()=>addManual(raw))};
   $('#zMan').onclick=()=>addManual('');
-  q.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const t=q.value.trim().toLowerCase();if(!t)return;const ex=prods().find(p=>(p.barcode&&String(p.barcode).toLowerCase()===t)||(p.sku&&String(p.sku).toLowerCase()===t));const first=$('#zRes [data-add], #zRes [data-calc]');if(ex)addLine(ex.id);else if(first&&first.dataset.add)addLine(first.dataset.add);else if(first)addCalc(first.dataset.calc);else return;const nq=$('#zQ');if(nq)nq.focus()}};
+  q.onkeydown=e=>{const items=$$('#zRes .item');let si=items.findIndex(x=>x.classList.contains('sel'));
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!items.length)return;e.preventDefault();si=e.key==='ArrowDown'?(si+1)%items.length:(si<=0?items.length-1:si-1);items.forEach((x,k)=>x.classList.toggle('sel',k===si));items[si].scrollIntoView({block:'nearest'});return}
+    if(e.key==='ArrowRight'&&q.selectionEnd===q.value.length&&F.lines.length){e.preventDefault();focusField(F.lines.length-1,'pr');return}
+    if(e.key!=='Enter')return;e.preventDefault();const t=q.value.trim().toLowerCase();
+    if(!t){addManual('');return}   // bo'sh qidiruvda Enter — yangi qo'lda qator
+    const sel=si>=0?items[si]:null;if(sel&&sel.dataset.manual){addManual(q.value.trim());return}
+    const ex=prods().find(p=>(p.barcode&&String(p.barcode).toLowerCase()===t)||(p.sku&&String(p.sku).toLowerCase()===t));const first=sel||$('#zRes [data-add], #zRes [data-calc]');let li=-1;
+    if(ex){addLine(ex.id);li=F.lines.findIndex(l=>l.pid===ex.id)}else if(first&&first.dataset.add){addLine(first.dataset.add);li=F.lines.findIndex(l=>l.pid===first.dataset.add)}else if(first&&first.dataset.calc){const c=CALC.find(x=>x.key===first.dataset.calc);addCalc(first.dataset.calc);if(c)li=F.lines.findIndex(l=>!l.pid&&l.src==='calc'&&norm(l.name)===norm(c.name))}else{addManual(q.value.trim());return}   // topilmasa — shu nom bilan qo'lda qator
+    if(li>=0)focusField(li,'pr');else{const nq=$('#zQ');if(nq)nq.focus()}};
+  // qator ichida klaviatura: ← → nom/narx/soni orasida, ↑ ↓ qatorlar orasida, Enter — yangi qator
+  $$('[data-nm],[data-pr],[data-q]').forEach(x=>x.onkeydown=e=>{const f=x.dataset.nm!=null?'nm':x.dataset.pr!=null?'pr':'q';const i=+x.dataset[f];const order=['nm','pr','q'];
+    if(e.key==='Enter'){e.preventDefault();const l=F.lines[i],man=l&&l.src==='manual';commit(x);setTimeout(()=>{if(man&&F.lines[i]&&!F.lines[i].name)return focusField(i,'nm');if(man)addManual('');else{const nq=$('#zQ');if(nq){nq.focus();nq.select()}}},40);return}
+    if(e.key==='ArrowRight'&&x.selectionEnd===x.value.length){const n=order.slice(order.indexOf(f)+1).find(k=>$(`[data-${k}="${i}"]`));if(n){e.preventDefault();commit(x);setTimeout(()=>focusField(i,n),40)}return}
+    if(e.key==='ArrowLeft'&&x.selectionStart===0){const n=order.slice(0,order.indexOf(f)).reverse().find(k=>$(`[data-${k}="${i}"]`));e.preventDefault();commit(x);setTimeout(()=>{if(n)focusField(i,n);else{const nq=$('#zQ');if(nq)nq.focus()}},40);return}
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const j=i+(e.key==='ArrowDown'?1:-1);commit(x);setTimeout(()=>{if(j<0){const nq=$('#zQ');if(nq)nq.focus()}else if(j<F.lines.length)focusField(j,$(`[data-${f}="${j}"]`)?f:'pr')},40)}});
   $$('[data-nm]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.nm].name=x.value.trim().replace(/\s+/g,' ');saveDraft()});
   $$('[data-inc]').forEach(b=>b.onclick=()=>{const l=F.lines[+b.dataset.inc];l.qty=r2(num(l.qty)+1);saveDraft();render()});
   $$('[data-dec]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dec,l=F.lines[i];l.qty=r2(num(l.qty)-1);if(l.qty<=0)F.lines.splice(i,1);saveDraft();render()});
@@ -300,6 +315,8 @@ function updTotals(){ // narx/son o'zgarganda butun sahifani qayta chizmasdan ja
     const s=$(`[data-st="${i}"]`);if(s&&P[l.pid])s.innerHTML=stockTxt(l.pid,l.qty)});
   const lf=$('#zLf');if(lf)lf.innerHTML=`<span>Jami: ${F.lines.length} xil, ${r2(F.lines.reduce((a,l)=>a+num(l.qty),0))} dona</span><b>${fmt(total())}</b>`;
   const sm=$('#zSum');if(sm)sm.innerHTML=sumHTML()}
+function commit(el){if(el&&el.onchange)el.dispatchEvent(new Event('change'))}   // yozilgan qiymatni darhol hisobga olish
+function focusField(i,k){const el=$(`[data-${k}="${i}"]`);if(el){el.focus();if(el.select)el.select();el.scrollIntoView({block:'nearest'})}}
 function addCalc(key){const c=CALC.find(x=>x.key===key);if(!c)return;const ex=F.lines.find(l=>!l.pid&&l.src==='calc'&&norm(l.name)===norm(c.name));
   if(ex)ex.qty=r2(num(ex.qty)+1);else F.lines.push({src:'calc',cat:c.cat,name:c.name,qty:1,price:c.price});saveDraft();render();toast(c.name+' qo\'shildi')}
 function addManual(name){F.lines.push({src:'manual',name:name,qty:1,price:0});saveDraft();render();const i=F.lines.length-1;setTimeout(()=>{const el=$(name?`[data-pr="${i}"]`:`[data-nm="${i}"]`);if(el){el.focus();if(el.select)el.select()}},30)}
