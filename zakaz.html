@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#E6E8EB">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Hed zakaz">
+<meta name="apple-mobile-web-app-title" content="Hed buyurtma">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="zakaz.webmanifest">
-<title>Hed zakaz</title>
+<title>Hed buyurtma</title>
 <style>
 :root{
   --bg:#F2F3F5; --panel:#FFFFFF; --soft:#F7F8FA; --line:#D7DAE0; --ink:#3A3F47; --ink2:#6B7178;
@@ -119,8 +119,8 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 <div id="root"></div>
 <script>
 'use strict';
-/* Hed zakaz — sotuvchilar kompyuterida mijozdan zakaz olish.
-   Zakazlar Google Sheets'ga yoziladi (Google Apps Script veb-ilovasi orqali). Hed balans bilan bog'langan bo'lsa ostatka ko'rinadi. */
+/* Hed buyurtma — sotuvchilar kompyuterida mijozdan buyurtma olish.
+   Buyurtmalar Google Sheets'ga yoziladi (Google Apps Script veb-ilovasi orqali). Hed balans bilan bog'langan bo'lsa ostatka ko'rinadi. */
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
@@ -134,7 +134,7 @@ const DEF_URL='https://script.google.com/macros/s/AKfycbyI39wOuo4c7-R1pI9wwjfKhi
 let SET=lsGet('hz_set',null);            // {url, pin} — shu kompyuter uchun bir marta
 let INIT=lsGet('hz_init',null);          // server bergan: kompaniya, valyuta, sotuvchilar, kalkulyator, (bog'langan bo'lsa) katalog va ostatka
 let SELLER=lsGet('hz_seller2','');       // shu kompyuterdagi sotuvchi
-let OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all';
+let VD=today(),OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all';
 let F=lsGet('hz_draft',null)||blank();
 const cur=()=>(INIT&&INIT.currency)||'USD';
 const linked=()=>!!(INIT&&INIT.linked);
@@ -192,26 +192,28 @@ const freeOf=pid=>{const p=P[pid];return p?r2(num(p.stock)-num(p.reserved)-myOut
 const prods=()=>Object.values(P).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
 const sellers=()=>((INIT&&INIT.sellers)||[]).filter(Boolean);
 
-/* ---------- navbat: internet yo'qligida saqlangan zakazlar ---------- */
+/* ---------- navbat: internet yo'qligida saqlangan buyurtmalar ---------- */
 let FLUSHING=null;
 async function flush(){
   if(FLUSHING)return FLUSHING;
   FLUSHING=(async()=>{const todo=OUT.filter(o=>!o._err);if(!todo.length||!SET)return;let changed=false;
-    for(const o of todo){try{const p={...o};delete p._label;delete p._err;const r=await api('order',{order:p});OUT=OUT.filter(x=>x.id!==o.id);changed=true;reserve(o,1);setNet(true);toast(`${o._label||'Zakaz'} yuborildi · ${r.order.no}`)}
-      catch(e){if(e.net){setNet(false);break}if(e.auth||e.temp)break;OUT=OUT.map(x=>x.id===o.id?{...x,_err:e.message}:x);changed=true;toast(`Zakaz yuborilmadi: ${e.message}`,true)}}
+    for(const o of todo){try{const p={...o};delete p._label;delete p._err;const r=await api('order',{order:p});OUT=OUT.filter(x=>x.id!==o.id);changed=true;reserve(o,1);setNet(true);toast(`${o._label||'Buyurtma'} yuborildi · ${r.order.no}`)}
+      catch(e){if(e.net){setNet(false);break}if(e.auth||e.temp)break;OUT=OUT.map(x=>x.id===o.id?{...x,_err:e.message}:x);changed=true;toast(`Buyurtma yuborilmadi: ${e.message}`,true)}}
     if(changed){lsSet('hz_out',OUT);updPend();if(tab==='today')loadToday(true)}})().finally(()=>{FLUSHING=null});
   return FLUSHING}
 function reserve(o,k){if(!INIT||!INIT.products)return;for(const l of o.lines)if(l.pid&&P[l.pid])P[l.pid].reserved=r2(num(P[l.pid].reserved)+k*num(l.qty));lsSet('hz_init',INIT)}
-function pendHTML(){return OUT.length?`<div class="pend">Yuborilmagan zakazlar: ${OUT.length} ta — internet qaytganda avtomatik yuboriladi${OUT.some(o=>o._err)?`<br>Xato: ${esc(OUT.find(o=>o._err)._err)} <button class="btn sm" id="retryErr">Qayta yuborish</button> <button class="btn sm" id="dropErr">Xatolilarni o'chirish</button>`:''}</div>`:''}
-function bindPend(){const rt=$('#retryErr');if(rt)rt.onclick=()=>{OUT=OUT.map(o=>{const x={...o};delete x._err;return x});lsSet('hz_out',OUT);updPend();flush()};const d=$('#dropErr');if(d)d.onclick=()=>{if(!confirm("Xato bilan qaytgan zakazlar o'chirilsinmi?"))return;OUT=OUT.filter(o=>!o._err);lsSet('hz_out',OUT);updPend()}}
+function pendHTML(){return OUT.length?`<div class="pend">Yuborilmagan buyurtmalar: ${OUT.length} ta — internet qaytganda avtomatik yuboriladi${OUT.some(o=>o._err)?`<br>Xato: ${esc(OUT.find(o=>o._err)._err)} <button class="btn sm" id="retryErr">Qayta yuborish</button> <button class="btn sm" id="dropErr">Xatolilarni o'chirish</button>`:''}</div>`:''}
+function bindPend(){const rt=$('#retryErr');if(rt)rt.onclick=()=>{OUT=OUT.map(o=>{const x={...o};delete x._err;return x});lsSet('hz_out',OUT);updPend();flush()};const d=$('#dropErr');if(d)d.onclick=()=>{if(!confirm("Xato bilan qaytgan buyurtmalar o'chirilsinmi?"))return;OUT=OUT.filter(o=>!o._err);lsSet('hz_out',OUT);updPend()}}
 function updPend(){const box=$('#pendBox');if(box){box.innerHTML=pendHTML();bindPend()}}
-async function loadToday(quiet){try{const r=await api('list',{date:today()});ORD=r.orders||[];LIST_ERR=r.syncErr?"Hed balans holatini olib bo'lmadi: "+r.syncErr:'';setNet(true);if(tab==='today')render()}
+const shiftDay=(d,k)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+k);return t.toISOString().slice(0,10)};
+const dmy=d=>String(d||'').split('-').reverse().join('.');
+async function loadToday(quiet){const d=VD;try{const r=await api('list',{date:d});if(d!==VD)return;ORD=r.orders||[];LIST_ERR=r.syncErr?"Hed balans holatini olib bo'lmadi: "+r.syncErr:'';setNet(true);if(tab==='today')render()}
   catch(e){if(e.net)setNet(false);if(!quiet)toast(e.net?"Internet yo'q":e.message,true)}}
 
 /* ---------- ekranlar ---------- */
 function box(html){$('#root').innerHTML=`<div class="auth"><div class="box">${html}</div></div>`}
 function setupScreen(msg,kind){
-  box(`<b class="muted">Hed zakaz</b><h1>Ulanish</h1><p class="muted" style="margin-top:0">Bu kompyuter uchun bir marta sozlanadi. Faqat PIN ni kiriting.</p>
+  box(`<b class="muted">Hed buyurtma</b><h1>Ulanish</h1><p class="muted" style="margin-top:0">Bu kompyuter uchun bir marta sozlanadi. Faqat PIN ni kiriting.</p>
    <form id="sf" novalidate><details style="margin-bottom:10px"><summary class="muted" style="cursor:pointer;font-size:12px">Server manzili</summary><label class="field" style="margin-top:6px"><span>Google skript manzili (Web app URL)</span><input type="url" id="sU" value="${esc((SET&&SET.url)||DEF_URL)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false"></label></details>
    <label class="field"><span>PIN</span><input type="password" id="sP" autocomplete="off"></label>
    <button class="btn pri" style="width:100%" id="sOk">Ulanish</button></form><div class="msg ${kind||'err'}" id="sMsg">${esc(msg||'')}</div>`);
@@ -226,7 +228,7 @@ function setupScreen(msg,kind){
   setTimeout(()=>{const i=$('#sP');if(i)i.focus()},0)}
 function sellerScreen(){
   const s=sellers();
-  box(`<b class="muted">Hed zakaz · ${esc((INIT&&INIT.company)||'')}</b><h1>Sotuvchi kim?</h1><p class="muted" style="margin-top:0">Bu kompyuterda zakazlar shu ism bilan yoziladi. Keyin tepadagi ism ustiga bosib almashtirsa bo'ladi.</p>
+  box(`<b class="muted">Hed buyurtma · ${esc((INIT&&INIT.company)||'')}</b><h1>Sotuvchi kim?</h1><p class="muted" style="margin-top:0">Bu kompyuterda buyurtmalar shu ism bilan yoziladi. Keyin tepadagi ism ustiga bosib almashtirsa bo'ladi.</p>
    <div class="sellers">${s.map(x=>`<button class="btn ${x===SELLER?'pri':''}" data-s="${esc(x)}">${esc(x)}</button>`).join('')}</div>
    <form id="slf"><label class="field"><span>${s.length?"Ro'yxatda yo'q bo'lsa — ismini yozing":'Ismingiz'}</span><input type="text" id="slN" maxlength="60" autocomplete="off" value="${esc(SELLER&&!s.includes(SELLER)?SELLER:'')}"></label><button class="btn ${s.length?'':'pri'}" style="width:100%">Davom etish</button></form>
    ${SELLER?'<div class="links"><a id="slBack">Ortga</a></div>':''}`);
@@ -236,9 +238,9 @@ function sellerScreen(){
   if($('#slBack'))$('#slBack').onclick=()=>boot()}
 function boot(){
   if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
-  $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed zakaz</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
+  $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed buyurtma</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
      <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
-   <div class="tabs"><button data-tab="new">Yangi zakaz</button><button data-tab="today">Bugungi zakazlar</button></div></header><main id="main"></main><div id="bar"></div>`;
+   <div class="tabs"><button data-tab="new">Yangi buyurtma</button><button data-tab="today">Bugungi buyurtmalar</button></div></header><main id="main"></main><div id="bar"></div>`;
   $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
   $('#whoBtn').onclick=sellerScreen;
   $('#setBtn').onclick=()=>{if(confirm("Ulanish sozlamalari (Google skript manzili va PIN) qayta kiritilsinmi?"))setupScreen()};
@@ -256,7 +258,7 @@ function catInfo(){if(!INIT)return '';const b=linked()?(INIT.balansErr?`<span st
 function viewNew(pend){
   const debt=F.pay==='debt';const k=F.cid&&CL.find(c=>c.id===F.cid);
   const ed=F.edit;
-  $('#main').innerHTML=`${pend}${ed?`<div class="pend" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">✏️ Zakaz ${esc(ed.no)} o'zgartirilmoqda (${esc(ed.seller||'')}${ed.time?' · '+esc(ed.time):''}) <button class="btn sm" id="zEdX">O'zgartirishni bekor qilish</button></div>`:''}<div class="card"><h3>Mijoz va to'lov</h3>
+  $('#main').innerHTML=`${pend}${ed?`<div class="pend" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">✏️ Buyurtma ${esc(ed.no)} o'zgartirilmoqda (${esc(ed.seller||'')}${ed.time?' · '+esc(ed.time):''}) <button class="btn sm" id="zEdX">O'zgartirishni bekor qilish</button></div>`:''}<div class="card"><h3>Mijoz va to'lov</h3>
     <div class="seg"><button data-pay="cash" class="${!debt?'on':''}">Naqd olindi</button><button data-pay="debt" class="${debt?'on':''}">Qarzga</button></div>
     ${CL.length?`<label class="field"><span>Mijoz (Hed balansdagi ro'yxat)${debt?'':' — ixtiyoriy'}</span><select id="zCid"><option value="">— ro'yxatdan tanlang yoki pastda ismini yozing —</option>${CL.map(c=>`<option value="${esc(c.id)}" ${c.id===F.cid?'selected':''}>${esc(c.name)}${c.phone?' · '+esc(c.phone):''}</option>`).join('')}</select></label>`:''}
     ${k?'':`<div class="row2"><label class="field"><span>Mijoz ismi${debt?' *':' (ixtiyoriy)'}</span><input type="text" id="zName" value="${esc(F.client)}" placeholder="Masalan: Sobir aka (Chorsu)" autocomplete="off" maxlength="120"></label><label class="field"><span>Telefon</span><input type="tel" id="zPhone" value="${esc(F.phone)}" placeholder="+998" inputmode="tel" maxlength="40"></label></div>`}
@@ -287,26 +289,35 @@ function viewNew(pend){
     $$('[data-manual]',bx).forEach(x=>x.onclick=()=>addManual(raw))};
   $('#zMan').onclick=()=>addManual('');
   q.onkeydown=e=>{const items=$$('#zRes .item');let si=items.findIndex(x=>x.classList.contains('sel'));
+    if(e.key==='ArrowDown'&&!items.length&&F.lines.length){e.preventDefault();return focusField(0,'pr')}
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!items.length)return;e.preventDefault();si=e.key==='ArrowDown'?(si+1)%items.length:(si<=0?items.length-1:si-1);items.forEach((x,k)=>x.classList.toggle('sel',k===si));items[si].scrollIntoView({block:'nearest'});return}
     if(e.key==='ArrowRight'&&q.selectionEnd===q.value.length&&F.lines.length){e.preventDefault();focusField(F.lines.length-1,'pr');return}
+    if(e.key==='Escape'){q.value='';$('#zRes').innerHTML='';return}
     if(e.key!=='Enter')return;e.preventDefault();const t=q.value.trim().toLowerCase();
     if(!t){addManual('');return}   // bo'sh qidiruvda Enter — yangi qo'lda qator
     const sel=si>=0?items[si]:null;if(sel&&sel.dataset.manual){addManual(q.value.trim());return}
     const ex=prods().find(p=>(p.barcode&&String(p.barcode).toLowerCase()===t)||(p.sku&&String(p.sku).toLowerCase()===t));const first=sel||$('#zRes [data-add], #zRes [data-calc]');let li=-1;
     if(ex){addLine(ex.id);li=F.lines.findIndex(l=>l.pid===ex.id)}else if(first&&first.dataset.add){addLine(first.dataset.add);li=F.lines.findIndex(l=>l.pid===first.dataset.add)}else if(first&&first.dataset.calc){const c=CALC.find(x=>x.key===first.dataset.calc);addCalc(first.dataset.calc);if(c)li=F.lines.findIndex(l=>!l.pid&&l.src==='calc'&&norm(l.name)===norm(c.name))}else{addManual(q.value.trim());return}   // topilmasa — shu nom bilan qo'lda qator
     if(li>=0)focusField(li,'pr');else{const nq=$('#zQ');if(nq)nq.focus()}};
-  // qator ichida klaviatura: ← → nom/narx/soni orasida, ↑ ↓ qatorlar orasida, Enter — yangi qator
+  // qator ichida klaviatura — Excel kabi: ← → ↑ ↓ katakdan katakka (nom/narx/soni, qatorlar), Tab / Shift+Tab, Enter — pastga (oxirida yangi qator), Esc — qidiruvga
   $$('[data-nm],[data-pr],[data-q]').forEach(x=>x.onkeydown=e=>{const f=x.dataset.nm!=null?'nm':x.dataset.pr!=null?'pr':'q';const i=+x.dataset[f];const order=['nm','pr','q'];
-    if(e.key==='Enter'){e.preventDefault();const l=F.lines[i],man=l&&l.src==='manual';commit(x);setTimeout(()=>{if(man&&F.lines[i]&&!F.lines[i].name)return focusField(i,'nm');if(man)addManual('');else{const nq=$('#zQ');if(nq){nq.focus();nq.select()}}},40);return}
-    if(e.key==='ArrowRight'&&x.selectionEnd===x.value.length){const n=order.slice(order.indexOf(f)+1).find(k=>$(`[data-${k}="${i}"]`));if(n){e.preventDefault();commit(x);setTimeout(()=>focusField(i,n),40)}return}
-    if(e.key==='ArrowLeft'&&x.selectionStart===0){const n=order.slice(0,order.indexOf(f)).reverse().find(k=>$(`[data-${k}="${i}"]`));e.preventDefault();commit(x);setTimeout(()=>{if(n)focusField(i,n);else{const nq=$('#zQ');if(nq)nq.focus()}},40);return}
-    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const j=i+(e.key==='ArrowDown'?1:-1);commit(x);setTimeout(()=>{if(j<0){const nq=$('#zQ');if(nq)nq.focus()}else if(j<F.lines.length)focusField(j,$(`[data-${f}="${j}"]`)?f:'pr')},40)}});
+    const has=(j,k)=>!!$(`[data-${k}="${j}"]`);const cols=j=>order.filter(k=>has(j,k));
+    const toSearch=()=>{const nq=$('#zQ');if(nq){nq.focus();nq.select()}};
+    const go=fn=>{e.preventDefault();commit(x);setTimeout(fn,40)};
+    if(e.key==='Escape')return go(toSearch);
+    if(e.key==='Enter'||(e.key==='ArrowDown'&&!e.altKey)){const l=F.lines[i],man=l&&l.src==='manual';return go(()=>{if(e.key==='Enter'&&man&&F.lines[i]&&!F.lines[i].name)return focusField(i,'nm');   // nomsiz qator — avval nom
+      const j=i+1;if(j<F.lines.length)return focusField(j,has(j,f)?f:'pr');if(e.key==='Enter'&&man)return addManual('');toSearch()})}
+    if(e.key==='ArrowUp')return go(()=>{const j=i-1;if(j<0)return toSearch();focusField(j,has(j,f)?f:'pr')});
+    if(e.key==='ArrowRight'||(e.key==='Tab'&&!e.shiftKey)){const c=cols(i),n=c[c.indexOf(f)+1];return go(()=>{if(n)return focusField(i,n);if(e.key==='Tab'){const j=i+1;if(j<F.lines.length)return focusField(j,cols(j)[0]);return toSearch()}})}
+    if(e.key==='ArrowLeft'||(e.key==='Tab'&&e.shiftKey)){const c=cols(i),n=c[c.indexOf(f)-1];return go(()=>{if(n)return focusField(i,n);if(e.key==='Tab'&&i>0){const cj=cols(i-1);return focusField(i-1,cj[cj.length-1])}toSearch()})}
+    if(e.key==='Home'&&e.ctrlKey)return go(toSearch);
+    if(e.key==='End'&&e.ctrlKey)return go(()=>{const j=F.lines.length-1;const cj=cols(j);focusField(j,cj[cj.length-1])})});
   $$('[data-nm]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.nm].name=x.value.trim().replace(/\s+/g,' ');saveDraft()});
   $$('[data-inc]').forEach(b=>b.onclick=()=>{const l=F.lines[+b.dataset.inc];l.qty=r2(num(l.qty)+1);saveDraft();render()});
   $$('[data-dec]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dec,l=F.lines[i];l.qty=r2(num(l.qty)-1);if(l.qty<=0)F.lines.splice(i,1);saveDraft();render()});
   $$('[data-q]').forEach(x=>x.onchange=()=>{const i=+x.dataset.q;const v=num(x.value);if(v<=0){F.lines.splice(i,1);saveDraft();render();return}F.lines[i].qty=v;saveDraft();updTotals()});
   $$('[data-pr]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.pr].price=Math.max(0,num(x.value));saveDraft();updTotals()});
-  $('#zClr').onclick=()=>{if(F.lines.length&&!confirm(ed?"O'zgarishlar saqlanmasin, zakaz o'z holicha qolsinmi?":'Zakaz tozalansinmi?'))return;F=blank();saveDraft();render()};
+  $('#zClr').onclick=()=>{if(F.lines.length&&!confirm(ed?"O'zgarishlar saqlanmasin, buyurtma o'z holicha qolsinmi?":'Buyurtma tozalansinmi?'))return;F=blank();saveDraft();render()};
   if($('#zEdX'))$('#zEdX').onclick=()=>{F=blank();saveDraft();tab='today';render();loadToday()};
   $('#zSave').onclick=save}
 function sumHTML(){return `<small class="muted">${F.lines.length} ta mahsulot · ${F.pay==='debt'?'qarzga':'naqd'}</small><b>${fmt(total())}</b><small class="muted">${uzs(total())}</small>`}
@@ -335,33 +346,33 @@ async function save(){
     if(!frac&&!Number.isInteger(num(l.qty)))return toast(`"${nm}" soni butun son bo'lishi kerak`,true);
     if(p&&INIT.minPriceCheck!==false&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001)return toast(`"${p.name}" minimal narxdan (${fmt(p.minPrice)}) arzon bo'lmaydi`,true)}
   saving=true;$('#zSave').disabled=true;
-  if(!F.id){F.id=uid();saveDraft()}   // bitta qoralama — bitta id: xatodan keyin qayta bosilsa takror zakaz bo'lmaydi
+  if(!F.id){F.id=uid();saveDraft()}   // bitta qoralama — bitta id: xatodan keyin qayta bosilsa takror buyurtma bo'lmaydi
   const o={id:F.id,date:today(),seller:SELLER,pay:F.pay,cid:k?k.id:'',client:k?k.name:name,phone:k?(k.phone||''):String(F.phone||'').trim(),note:String(F.note||'').trim(),
     lines:F.lines.map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',src:'balans',name:String(l.name).trim(),qty:num(l.qty),price:num(l.price)}:{src:l.src,cat:l.cat||'',name:String(l.name).trim().replace(/\s+/g,' '),qty:num(l.qty),price:num(l.price)})};
   const label=(o.client||'Naqd mijoz')+' · '+fmt(total());
   if(F.edit){o.seller=F.edit.seller||SELLER;o.date=F.edit.date||o.date;
     try{const r=await api('edit',{order:o});setNet(true);const old=ORD.find(x=>x.id===o.id);if(old)reserve(old,-1);reserve(o,1);
       const i=ORD.findIndex(x=>x.id===o.id);if(i>=0)ORD[i]=r.order;
-      toast(`Zakaz ${r.order.no} o'zgartirildi · ${fmt(r.order.total)}`);F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(r.order,true)}
+      toast(`Buyurtma ${r.order.no} o'zgartirildi · ${fmt(r.order.total)}`);F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(r.order,true)}
     catch(e){toast(e.net?"Internet yo'q — o'zgarish saqlanmadi, internet qaytgach yana «O'zgarishlarni saqlash» ni bosing":e.message,true);if(e.net)setNet(false);if(e.auth)setTimeout(()=>setupScreen(e.message),1500)}
     finally{saving=false;const b=$('#zSave');if(b)b.disabled=!F.lines.length}
     return}
   try{
     let done={...o,no:'',total:total(),time:hmNow(),lines:o.lines.map(l=>({...l,sum:lineSum(l)}))};
-    try{const r=await api('order',{order:o});reserve(o,1);setNet(true);done.no=r.order.no;done.total=r.order.total;toast(`Zakaz ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
-    catch(e){if(!e.net&&!e.temp)throw e;OUT=OUT.filter(x=>x.id!==o.id);OUT.push({...o,_label:label});lsSet('hz_out',OUT);if(e.net)setNet(false);toast(e.net?"Internet yo'q — zakaz kompyuterda saqlandi, aloqa tiklanganda yuboriladi":"Server band — zakaz kompyuterda saqlandi, birozdan keyin o'zi yuboriladi")}
+    try{const r=await api('order',{order:o});reserve(o,1);setNet(true);done.no=r.order.no;done.total=r.order.total;toast(`Buyurtma ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
+    catch(e){if(!e.net&&!e.temp)throw e;OUT=OUT.filter(x=>x.id!==o.id);OUT.push({...o,_label:label});lsSet('hz_out',OUT);if(e.net)setNet(false);toast(e.net?"Internet yo'q — buyurtma kompyuterda saqlandi, aloqa tiklanganda yuboriladi":"Server band — buyurtma kompyuterda saqlandi, birozdan keyin o'zi yuboriladi")}
     F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(done)}
   catch(e){toast(e.message,true);if(e.auth)setTimeout(()=>setupScreen(e.message),1500)}
   finally{saving=false;const b=$('#zSave');if(b)b.disabled=!F.lines.length}}
-/* ---------- mijoz uchun zakaz varaqasi (PDF): tagida sotuvchi ismi va do'kon muhri (muhr.png) ---------- */
+/* ---------- mijoz uchun buyurtma varaqasi (PDF): tagida sotuvchi ismi va do'kon muhri (muhr.png) ---------- */
 const hmNow=()=>{try{return new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})}catch(e){return ''}};
 function orderDocHTML(o){
   const d=String(o.date||today()).split('-').reverse().join('.');const ls=o.lines||[];
   const td='padding:9px 10px;border-bottom:1px solid #D7DAE0;vertical-align:top';
   return `<div style="width:794px;box-sizing:border-box;padding:56px 56px 48px;background:#fff;color:#2B2F35;font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #3A3F47;padding-bottom:14px">
-     <div><div style="font-size:24px;font-weight:800;letter-spacing:.2px">${esc((INIT&&INIT.company)||'')}</div><div style="color:#6B7178;margin-top:2px">Mijoz uchun zakaz varaqasi</div></div>
-     <div style="text-align:right"><div style="font-size:18px;font-weight:700">Zakaz ${o.no?'№ '+esc(o.no):''}</div><div style="color:#6B7178">${d}${o.time?' · '+esc(o.time):''}</div></div></div>
+     <div><div style="font-size:24px;font-weight:800;letter-spacing:.2px">${esc((INIT&&INIT.company)||'')}</div><div style="color:#6B7178;margin-top:2px">Mijoz uchun buyurtma varaqasi</div></div>
+     <div style="text-align:right"><div style="font-size:18px;font-weight:700">Buyurtma ${o.no?'№ '+esc(o.no):''}</div><div style="color:#6B7178">${d}${o.time?' · '+esc(o.time):''}</div></div></div>
    <table style="margin:18px 0 6px;border-collapse:collapse;font-size:14px"><tr><td style="padding:3px 18px 3px 0;color:#6B7178">Mijoz</td><td style="padding:3px 0;font-weight:600">${esc(o.client||'Naqd mijoz')}</td></tr>
      ${o.phone?`<tr><td style="padding:3px 18px 3px 0;color:#6B7178">Telefon</td><td style="padding:3px 0">${esc(o.phone)}</td></tr>`:''}
      <tr><td style="padding:3px 18px 3px 0;color:#6B7178">To'lov</td><td style="padding:3px 0">${o.pay==='debt'?'Qarzga':'Naqd'}</td></tr></table>
@@ -386,12 +397,12 @@ async function orderPdf(o){
     const pageH=Math.floor(cv.width*H/W);
     for(let y=0,p=0;y<cv.height-8;y+=pageH,p++){const c=document.createElement('canvas');c.width=cv.width;c.height=Math.min(pageH,cv.height-y);c.getContext('2d').drawImage(cv,0,y,cv.width,c.height,0,0,cv.width,c.height);
       if(p)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,c.height*W/cv.width)}
-    pdf.save(`Zakaz_${(o.no||'yangi').replace(/[^\w-]+/g,'_')}${o.client?'_'+String(o.client).replace(/[^\wА-Яа-яЎўҚқҒғҲҳ'-]+/g,'_').slice(0,30):''}.pdf`)}
+    pdf.save(`Buyurtma_${(o.no||'yangi').replace(/[^\w-]+/g,'_')}${o.client?'_'+String(o.client).replace(/[^\wА-Яа-яЎўҚқҒғҲҳ'-]+/g,'_').slice(0,30):''}.pdf`)}
   finally{box.remove()}}
 function orderPrint(o){const w=window.open('','_blank');if(!w){toast("Brauzer yangi oyna ochishga ruxsat bermadi",true);return}
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Zakaz ${esc(o.no||'')}</title><base href="${esc(location.href)}"><style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${orderDocHTML(o)}<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Buyurtma ${esc(o.no||'')}</title><base href="${esc(location.href)}"><style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${orderDocHTML(o)}<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
 function pdfModal(o,edited){
-  const ov=document.createElement('div');ov.className='ov';ov.innerHTML=`<div class="sheet"><h3 style="margin:0 0 6px">${o.no?'Zakaz '+esc(o.no)+(edited?" o'zgartirildi":' saqlandi'):'Zakaz saqlandi'}</h3><p class="muted" style="margin:0 0 14px">${esc(o.client||'Naqd mijoz')} · ${fmt(num(o.total))}${o.no?'':' · raqam internet qaytganda beriladi'}</p>
+  const ov=document.createElement('div');ov.className='ov';ov.innerHTML=`<div class="sheet"><h3 style="margin:0 0 6px">${o.no?'Buyurtma '+esc(o.no)+(edited?" o'zgartirildi":' saqlandi'):'Buyurtma saqlandi'}</h3><p class="muted" style="margin:0 0 14px">${esc(o.client||'Naqd mijoz')} · ${fmt(num(o.total))}${o.no?'':' · raqam internet qaytganda beriladi'}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn pri" id="pdfDl">PDF yuklab olish</button><button class="btn" id="pdfPr">Chop etish</button><button class="btn" id="pdfX">Yopish</button></div></div>`;
   document.body.appendChild(ov);const close=()=>{ov.remove();const nq=$('#zQ');if(nq)nq.focus()};
   ov.onclick=e=>{if(e.target===ov)close()};$('#pdfX',ov).onclick=close;
@@ -404,33 +415,36 @@ function viewToday(pend){
   const nWait=act.filter(o=>!o.delivered).length,nDone=act.filter(o=>o.delivered).length;
   const L=base.filter(o=>DF==='all'||(DF==='wait'?o.status!=='cancelled'&&!o.delivered:o.status!=='cancelled'&&o.delivered));
   $('#main').innerHTML=`${pend}${LIST_ERR?`<div class="pend">${esc(LIST_ERR)}</div>`:''}<div class="seg" style="margin-bottom:10px"><button data-mine="1" class="${MINE?'on':''}">Meniki (${esc(SELLER)})</button><button data-mine="0" class="${!MINE?'on':''}">Hamma sotuvchilar</button></div>
-   <div class="stats"><div><small>Zakazlar</small><b>${act.length}</b></div><div><small>Naqd olindi</small><b>${fmt(cash)}</b></div><div><small>Qarzga</small><b>${fmt(debt)}</b></div></div>
+   <div class="stats"><div><small>Buyurtmalar</small><b>${act.length}</b></div><div><small>Naqd olindi</small><b>${fmt(cash)}</b></div><div><small>Qarzga</small><b>${fmt(debt)}</b></div></div>
    <div class="seg" style="margin-bottom:12px"><button data-df="all" class="${DF==='all'?'on':''}">Hammasi</button><button data-df="wait" class="${DF==='wait'?'on':''}">Berilmagan (${nWait})</button><button data-df="done" class="${DF==='done'?'on':''}">Chiqarildi (${nDone})</button></div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0">Bugun, ${today().split('-').reverse().join('.')}</h3><button class="btn sm" id="zRef">Yangilash</button></div>
-   ${linked()?`<p class="hint" style="margin:0 0 6px">Zakaz Hed balansda sotuvga aylantirilganda o'zi «Chiqarildi» bo'ladi.</p>`:''}
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0">${VD===today()?'Bugun, ':''}${dmy(VD)}</h3><button class="btn sm" id="zRef">Yangilash</button></div>
+   <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><button class="btn sm" id="zDPrev" title="Oldingi kun">◀</button><input type="date" id="zD" value="${VD}" max="${today()}" style="flex:1;padding:7px 10px"><button class="btn sm" id="zDNext" title="Keyingi kun" ${VD>=today()?'disabled':''}>▶</button>${VD===today()?'':'<button class="btn sm" id="zDToday">Bugun</button>'}</div>
+   ${linked()?`<p class="hint" style="margin:0 0 6px">Buyurtma Hed balansda sotuvga aylantirilganda o'zi «Chiqarildi» bo'ladi.</p>`:''}
    <div class="list">${L.length?L.map(o=>{const c=o.status==='cancelled';const sale=/^Sotuv /.test(o.balans||'')?o.balans:'';return `<div class="item" style="align-items:flex-start"><div class="nm"><b>${esc(o.no)} · ${esc(o.client||'Naqd mijoz')}</b><small>${esc(o.time||'')}${o.seller?' · '+esc(o.seller):''} · ${o.lines.length} ta mahsulot${o.note?' · '+esc(o.note):''}</small>
      <small style="display:block">${o.lines.map(l=>esc(l.name)+' × '+l.qty).join(', ')}</small>
      ${!c?(o.delivered?`<small style="display:block;margin-top:4px"><span class="tag ok">✓ Chiqarildi</span>${sale?' '+esc(sale):''}</small>`:`<small style="display:block;margin-top:4px"><span class="tag warn">Hali berilmagan</span>${o.balans==='Kutilmoqda'?' <span class="tag">balansga yuborilmoqda</span>':/^Xato/.test(o.balans||'')?' <span class="tag bad">'+esc(o.balans)+'</span>':''}</small>`):''}</div>
      <div style="text-align:right;flex:none"><b ${c?'style="text-decoration:line-through"':''}>${fmt(o.total)}</b><br>${c?'<span class="tag bad">Bekor</span>':o.pay==='debt'?'<span class="tag warn">Qarzga</span>':'<span class="tag ok">Naqd</span>'}
-     ${c?`<br><button class="btn sm" style="margin-top:6px;color:var(--bad)" data-rm="${esc(o.id)}" title="Jadvaldan butunlay o'chirish">O'chirish</button>`:`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun zakaz varaqasi (PDF)">PDF</button>`}
-     ${c?'':o.delivered?(linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`):`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda zakaz yo'q.":"Bugun hali zakaz yo'q."}</p>`}</div></div>`;
+     ${c?`<br><button class="btn sm" style="margin-top:6px;color:var(--bad)" data-rm="${esc(o.id)}" title="Jadvaldan butunlay o'chirish">O'chirish</button>`:`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun buyurtma varaqasi (PDF)">PDF</button>`}
+     ${c?'':o.delivered?(linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`):`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda buyurtma yo'q.":VD===today()?"Bugun hali buyurtma yo'q.":"Bu kuni buyurtma bo'lmagan."}</p>`}</div></div>`;
   $('#zRef').onclick=()=>loadToday();
+  const goD=d=>{if(!d||d>today())return;VD=d;ORD=[];LIST_ERR='';render();loadToday()};
+  $('#zDPrev').onclick=()=>goD(shiftDay(VD,-1));$('#zDNext').onclick=()=>goD(shiftDay(VD,1));$('#zD').onchange=e=>goD(e.target.value);if($('#zDToday'))$('#zDToday').onclick=()=>goD(today());
   $$('[data-mine]').forEach(b=>b.onclick=()=>{MINE=b.dataset.mine==='1';render()});
   $$('[data-df]').forEach(b=>b.onclick=()=>{DF=b.dataset.df;render()});
   $$('[data-pdf]').forEach(b=>b.onclick=()=>{const o=ORD.find(x=>x.id===b.dataset.pdf);if(o)pdfModal(o)});
-  $$('[data-rm]').forEach(b=>b.onclick=async()=>{const o=ORD.find(x=>x.id===b.dataset.rm);if(!o||!confirm(`Bekor qilingan ${o.no} zakazi jadvaldan butunlay o'chirilsinmi? Qaytarib bo'lmaydi.`))return;b.disabled=true;
+  $$('[data-rm]').forEach(b=>b.onclick=async()=>{const o=ORD.find(x=>x.id===b.dataset.rm);if(!o||!confirm(`Bekor qilingan ${o.no} buyurtmasi jadvaldan butunlay o'chirilsinmi? Qaytarib bo'lmaydi.`))return;b.disabled=true;
     try{await api('remove',{id:o.id});ORD=ORD.filter(x=>x.id!==o.id);if(F.edit&&F.id===o.id){F=blank();saveDraft()}render();toast(`${o.no} o'chirildi`)}catch(e){b.disabled=false;toast(e.net?"Internet yo'q — keyinroq urinib ko'ring":e.message,true)}});
   $$('[data-edit]').forEach(b=>b.onclick=()=>{const o=ORD.find(x=>x.id===b.dataset.edit);if(!o)return;
-    if(F.lines.length&&!(F.edit&&F.id===o.id)&&!confirm(F.edit?`Zakaz ${F.edit.no} dagi saqlanmagan o'zgarishlar o'chadi. Davom etilsinmi?`:"Yozilayotgan yangi zakaz o'chadi. Davom etilsinmi?"))return;
+    if(F.lines.length&&!(F.edit&&F.id===o.id)&&!confirm(F.edit?`Buyurtma ${F.edit.no} dagi saqlanmagan o'zgarishlar o'chadi. Davom etilsinmi?`:"Yozilayotgan yangi buyurtma o'chadi. Davom etilsinmi?"))return;
     F={pay:o.pay==='debt'?'debt':'cash',cid:'',client:o.client==='Naqd mijoz'?'':(o.client||''),phone:o.phone||'',note:o.note||'',id:o.id,edit:{no:o.no,date:o.date,time:o.time,seller:o.seller},
       lines:(o.lines||[]).map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',name:l.name,qty:num(l.qty),price:num(l.price)}:{src:l.src==='calc'?'calc':'manual',cat:l.cat||'',name:l.name,qty:num(l.qty),price:num(l.price)})};
     saveDraft();tab='new';render();window.scrollTo(0,0)});
   const upd=r=>{const i=ORD.findIndex(x=>x.id===r.order.id);if(i>=0)ORD[i]=r.order;render()};
   const setDel=async(id,on)=>{try{const r=await api('deliver',{id,on});upd(r);toast(on?`${r.order.no} — chiqarildi`:`${r.order.no} — berilmagan`)}catch(e){toast(e.net?"Internet yo'q — keyinroq belgilang":e.message,true)}};
   $$('[data-del]').forEach(b=>b.onclick=()=>setDel(b.dataset.del,true));
-  $$('[data-undel]').forEach(b=>b.onclick=()=>{if(confirm('Zakaz «hali berilmagan» deb qaytarilsinmi?'))setDel(b.dataset.undel,false)});
-  $$('[data-cancel]').forEach(b=>b.onclick=async()=>{const o=ORD.find(x=>x.id===b.dataset.cancel);const why=prompt(`${o.no} zakazi bekor qilinsinmi? Sababi (ixtiyoriy):`,'');if(why===null)return;
-    try{const r=await api('cancel',{id:o.id,note:why});upd(r);if(o.status!=='cancelled')reserve(o,-1);toast('Zakaz bekor qilindi')}catch(e){toast(e.net?"Internet yo'q — keyinroq urinib ko'ring":e.message,true)}})}
+  $$('[data-undel]').forEach(b=>b.onclick=()=>{if(confirm('Buyurtma «hali berilmagan» deb qaytarilsinmi?'))setDel(b.dataset.undel,false)});
+  $$('[data-cancel]').forEach(b=>b.onclick=async()=>{const o=ORD.find(x=>x.id===b.dataset.cancel);const why=prompt(`${o.no} buyurtmasi bekor qilinsinmi? Sababi (ixtiyoriy):`,'');if(why===null)return;
+    try{const r=await api('cancel',{id:o.id,note:why});upd(r);if(o.status!=='cancelled')reserve(o,-1);toast('Buyurtma bekor qilindi')}catch(e){toast(e.net?"Internet yo'q — keyinroq urinib ko'ring":e.message,true)}})}
 
 /* ---------- ishga tushirish ---------- */
 function busyInput(){const a=document.activeElement;return !!(a&&a.closest&&a.closest('#main')&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))}
@@ -446,7 +460,7 @@ async function start(){
   loops();
   if(!SET)return setupScreen();
   if(INIT){useInit();boot();refresh();flush();return}
-  box('<h1>Hed zakaz</h1><p class="muted">Yuklanmoqda…</p>');
+  box('<h1>Hed buyurtma</h1><p class="muted">Yuklanmoqda…</p>');
   try{await loadInit();boot();flush()}catch(e){if(e.auth)return setupScreen(e.message);box(`<h1>Serverga ulanib bo'lmadi</h1><p class="muted">${esc(e.net?"Internet aloqasini tekshirib, sahifani yangilang.":e.message)}</p><button class="btn pri" onclick="location.reload()">Qayta urinish</button> <button class="btn" id="reSet">Ulanishni o'zgartirish</button>`);$('#reSet').onclick=()=>setupScreen()}}
 start();
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('sw.js').catch(()=>{});

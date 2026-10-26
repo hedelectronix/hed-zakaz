@@ -1,5 +1,5 @@
-// Hed zakaz — ilova qobig'ini oflayn ochish uchun kesh. Google skript so'rovlari keshlanmaydi.
-const CACHE = 'hz-shell-v2';
+// Hed buyurtma — ilova qobig'ini oflayn ochish uchun kesh. Google skript so'rovlari keshlanmaydi.
+const CACHE = 'hz-shell-v5';
 const SHELL = ['./', 'index.html', 'zakaz.html', 'zakaz.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

@@ -1,7 +1,7 @@
 {
-  "name": "Hed zakaz",
-  "short_name": "Hed zakaz",
-  "description": "Mijozdan zakaz olish — Google Sheets",
+  "name": "Hed buyurtma",
+  "short_name": "Hed buyurtma",
+  "description": "Mijozdan buyurtma olish — Google Sheets",
   "start_url": "zakaz.html",
   "scope": "./",
   "display": "standalone",
