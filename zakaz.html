@@ -60,7 +60,7 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .qty input{width:56px;text-align:center;padding:7px 4px}
 .pr{width:96px;text-align:right;padding:7px 8px}
 .ltab{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.ltab .lh,.ltab .lr{display:grid;grid-template-columns:minmax(0,1fr) 96px 126px 92px;gap:10px;align-items:center;padding:10px 12px}
+.ltab .lh,.ltab .lr{display:grid;grid-template-columns:minmax(0,1fr) 96px 126px 92px 30px;gap:10px;align-items:center;padding:10px 12px}
 .ltab .lh{background:var(--soft);font-size:13px;font-weight:700;color:var(--ink2);border-bottom:1px solid var(--line)}
 .ltab .lr{border-bottom:1px solid var(--line)}
 .ltab .lr .c-n b{display:block;font-weight:600;overflow-wrap:anywhere}
@@ -71,11 +71,13 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .ltab .lh .c-p{text-align:right}.ltab .lh .c-q{text-align:center}
 .ltab .lf{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px;background:var(--soft);font-weight:600}
 .ltab .lf b{font-size:18px}
+.ltab .c-x button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink2);font-size:18px;line-height:1;padding:0}
+.ltab .c-x button:hover{color:var(--bad);border-color:var(--bad)}
 @media (max-width:560px){
-  .ltab .lh,.ltab .lr{grid-template-columns:minmax(0,1fr) 112px minmax(70px,auto);row-gap:8px;padding:10px}
+  .ltab .lh,.ltab .lr{grid-template-columns:minmax(0,1fr) 112px minmax(70px,auto) 30px;row-gap:8px;padding:10px}
   .ltab .lh .c-n{display:none}
   .ltab .lr .c-n{grid-column:1 / -1}
-  .ltab .lh .c-p,.ltab .c-p{order:1}.ltab .lh .c-q,.ltab .c-q{order:2}.ltab .lh .c-s,.ltab .c-s{order:3}
+  .ltab .lh .c-p,.ltab .c-p{order:1}.ltab .lh .c-q,.ltab .c-q{order:2}.ltab .lh .c-s,.ltab .c-s{order:3}.ltab .lh .c-x,.ltab .c-x{order:4}
 }
 .muted{color:var(--ink2)}
 .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--accSoft);color:var(--ink)}
@@ -265,11 +267,12 @@ function viewNew(pend){
   </div>
   <div class="card"><h3>Mahsulotlar</h3><input type="search" id="zQ" placeholder="${linked()?'Mahsulot nomi, artikul yoki shtrix-kod':'Mahsulot nomi'}" autocomplete="off"><div id="zRes"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><small class="muted" id="zCat">${catInfo()}</small><button class="btn sm" id="zMan">+ Qo'lda kiritish</button></div>
-    <div class="ltab" id="zLines">${F.lines.length?`<div class="lh"><span class="c-n">Mahsulot nomi</span><span class="c-p">Narx</span><span class="c-q">Soni</span><span class="c-s">Jami</span></div>`+F.lines.map((l,i)=>{const p=P[l.pid];const low=p&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001&&INIT.minPriceCheck!==false;
+    <div class="ltab" id="zLines">${F.lines.length?`<div class="lh"><span class="c-n">Mahsulot nomi</span><span class="c-p">Narx</span><span class="c-q">Soni</span><span class="c-s">Jami</span><span class="c-x"></span></div>`+F.lines.map((l,i)=>{const p=P[l.pid];const low=p&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001&&INIT.minPriceCheck!==false;
       return `<div class="lr"><div class="c-n">${l.pid?`<b>${i+1}. ${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" value="${esc(l.name)}" placeholder="${i+1}. Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi"><small><span class="tag warn">Qo'lda</span></small>`:`<b>${i+1}. ${esc(l.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(l.cat||'')}</small>`}${low?`<small style="display:block;color:var(--bad)">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</div>
       <div class="c-p"><input type="text" inputmode="decimal" data-pr="${i}" value="${l.price}" aria-label="Narx"></div>
       <div class="c-q"><div class="qty"><button data-dec="${i}" aria-label="Kamaytirish">−</button><input type="text" inputmode="decimal" data-q="${i}" value="${l.qty}" aria-label="Soni"><button data-inc="${i}" aria-label="Ko'paytirish">+</button></div></div>
-      <div class="c-s"><b data-sum="${i}">${fmt(lineSum(l))}</b></div></div>`}).join('')+`<div class="lf" id="zLf"><span>Jami: ${F.lines.length} xil, ${r2(F.lines.reduce((a,l)=>a+num(l.qty),0))} dona</span><b>${fmt(total())}</b></div>`:'<p class="muted" style="margin:10px 0 2px">Hali mahsulot qo\'shilmagan — yuqoridan qidiring.</p>'}</div></div>
+      <div class="c-s"><b data-sum="${i}">${fmt(lineSum(l))}</b></div>
+      <div class="c-x"><button type="button" data-rml="${i}" title="Qatorni o'chirish" aria-label="Qatorni o'chirish">×</button></div></div>`}).join('')+`<div class="lf" id="zLf"><span>Jami: ${F.lines.length} xil, ${r2(F.lines.reduce((a,l)=>a+num(l.qty),0))} dona</span><b>${fmt(total())}</b></div>`:'<p class="muted" style="margin:10px 0 2px">Hali mahsulot qo\'shilmagan — yuqoridan qidiring.</p>'}</div></div>
   <div class="card"><label class="field" style="margin:0"><span>Izoh</span><textarea id="zNote" rows="2" maxlength="500" placeholder="Masalan: ertaga ertalab olib ketadi">${esc(F.note)}</textarea></label></div>`;
   $('#bar').innerHTML=`<div class="sticky"><div class="in"><div class="sum" id="zSum">${sumHTML()}</div><button class="btn" id="zClr">Tozalash</button><button class="btn pri" id="zSave" ${F.lines.length?'':'disabled'}>${ed?"O'zgarishlarni saqlash":'Saqlash'}</button></div></div>`;
   $$('[data-pay]').forEach(b=>b.onclick=()=>{F.pay=b.dataset.pay;saveDraft();render()});
@@ -313,6 +316,7 @@ function viewNew(pend){
     if(e.key==='Home'&&e.ctrlKey)return go(toSearch);
     if(e.key==='End'&&e.ctrlKey)return go(()=>{const j=F.lines.length-1;const cj=cols(j);focusField(j,cj[cj.length-1])})});
   $$('[data-nm]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.nm].name=x.value.trim().replace(/\s+/g,' ');saveDraft()});
+  $$('[data-rml]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rml;F.lines.splice(i,1);saveDraft();render();setTimeout(()=>{if(F.lines[i])focusField(i,'pr');else if(F.lines.length)focusField(F.lines.length-1,'pr');else{const nq=$('#zQ');if(nq)nq.focus()}},30)});
   $$('[data-inc]').forEach(b=>b.onclick=()=>{const l=F.lines[+b.dataset.inc];l.qty=r2(num(l.qty)+1);saveDraft();render()});
   $$('[data-dec]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dec,l=F.lines[i];l.qty=r2(num(l.qty)-1);if(l.qty<=0)F.lines.splice(i,1);saveDraft();render()});
   $$('[data-q]').forEach(x=>x.onchange=()=>{const i=+x.dataset.q;const v=num(x.value);if(v<=0){F.lines.splice(i,1);saveDraft();render();return}F.lines[i].qty=v;saveDraft();updTotals()});
