@@ -146,7 +146,7 @@ const DEF_URL='https://script.google.com/macros/s/AKfycbyI39wOuo4c7-R1pI9wwjfKhi
 let SET=lsGet('hz_set',null);            // {url, pin} — shu kompyuter uchun bir marta
 let INIT=lsGet('hz_init',null);          // server bergan: kompaniya, valyuta, sotuvchilar, kalkulyator, (bog'langan bo'lsa) katalog va ostatka
 let SELLER=lsGet('hz_seller2','');       // shu kompyuterdagi sotuvchi
-let VD=today(),OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all';
+let VD=today(),VR=lsGet('hz_range',7),OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all';
 let F=lsGet('hz_draft',null)||blank();
 const cur=()=>(INIT&&INIT.currency)||'USD';
 const linked=()=>!!(INIT&&INIT.linked);
@@ -219,8 +219,13 @@ function bindPend(){const rt=$('#retryErr');if(rt)rt.onclick=()=>{OUT=OUT.map(o=
 function updPend(){const box=$('#pendBox');if(box){box.innerHTML=pendHTML();bindPend()}}
 const shiftDay=(d,k)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+k);return t.toISOString().slice(0,10)};
 const dmy=d=>String(d||'').split('-').reverse().join('.');
-async function loadToday(quiet){const d=VD;try{const r=await api('list',{date:d});if(d!==VD)return;ORD=r.orders||[];LIST_ERR=r.syncErr?"Hed balans holatini olib bo'lmadi: "+r.syncErr:'';setNet(true);if(tab==='today')render()}
-  catch(e){if(e.net)setNet(false);if(!quiet)toast(e.net?"Internet yo'q":e.message,true)}}
+let LOADSEQ=0;
+async function loadToday(quiet){const seq=++LOADSEQ;const days=[];for(let k=0;k<VR;k++)days.push(shiftDay(VD,-k));
+  const out=[];let err='';
+  try{for(let s=0;s<days.length;s+=5){const part=days.slice(s,s+5);const rs=await Promise.all(part.map(d=>api('list',{date:d}).then(r=>({d,r}))));
+      if(seq!==LOADSEQ)return;for(const {d,r} of rs){for(const o of (r.orders||[])){o._d=o.date||d;out.push(o)}if(r.syncErr&&!err)err="Hed balans holatini olib bo'lmadi: "+r.syncErr}}
+    ORD=out;LIST_ERR=err;setNet(true);if(tab==='today')render()}
+  catch(e){if(seq!==LOADSEQ)return;if(e.net)setNet(false);if(!quiet)toast(e.net?"Internet yo'q":e.message,true)}}
 
 /* ---------- ekranlar ---------- */
 function box(html){$('#root').innerHTML=`<div class="auth"><div class="box">${html}</div></div>`}
@@ -252,7 +257,7 @@ function boot(){
   if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
   $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed buyurtma</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
      <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
-   <div class="tabs"><button data-tab="new">Yangi buyurtma</button><button data-tab="today">Bugungi buyurtmalar</button></div></header><main id="main"></main><div id="bar"></div>`;
+   <div class="tabs"><button data-tab="new">Yangi buyurtma</button><button data-tab="today">Buyurtmalar</button></div></header><main id="main"></main><div id="bar"></div>`;
   $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
   $('#whoBtn').onclick=sellerScreen;
   $('#setBtn').onclick=()=>{if(confirm("Ulanish sozlamalari (Google skript manzili va PIN) qayta kiritilsinmi?"))setupScreen()};
@@ -346,6 +351,8 @@ function gridKey(e){const x=e.currentTarget;const [is,k]=x.dataset.cell.split(':
   if(e.key==='Enter'||(e.key==='ArrowDown'&&!e.altKey)){const l=F.lines[i],man=l&&l.src==='manual';return go(()=>{if(e.key==='Enter'&&man&&F.lines[i]&&!F.lines[i].name)return focusCell(i,'nm');
     const j=i+1;if(j<F.lines.length)return focusCell(j,k);if(e.key==='Enter'&&man)return addManual('');toSearch()})}
   if(e.key==='ArrowUp')return go(()=>{const j=i-1;if(j<0)return toSearch();focusCell(j,k)});
+  const edge=(side)=>{if(!isIn)return true;const a=x.selectionStart,b=x.selectionEnd;if(a==null)return true;if(a===0&&b===x.value.length&&x.value)return true;return side<0?a===0:b===x.value.length};
+  if(e.key==='ArrowRight'&&!edge(1))return;if(e.key==='ArrowLeft'&&!edge(-1))return;
   if(e.key==='ArrowRight'||(e.key==='Tab'&&!e.shiftKey)){const n=GCOLS[ci+1];return go(()=>{if(n&&$(`[data-cell="${i}:${n}"]`))return focusCell(i,n);if(e.key==='Tab'){const j=i+1;if(j<F.lines.length)return focusCell(j,cols(j)[0]);return toSearch()}})}
   if(e.key==='ArrowLeft'||(e.key==='Tab'&&e.shiftKey)){const n=GCOLS[ci-1];return go(()=>{if(n&&$(`[data-cell="${i}:${n}"]`))return focusCell(i,n);if(e.key==='Tab'){if(i>0){const cj=cols(i-1);return focusCell(i-1,cj[cj.length-1])}toSearch()}})}
   if(e.key==='Home'&&e.ctrlKey)return go(toSearch);
@@ -375,7 +382,7 @@ async function save(){
   const label=(o.client||'Naqd mijoz')+' · '+fmt(total());
   if(F.edit){o.seller=F.edit.seller||SELLER;o.date=F.edit.date||o.date;
     try{const r=await api('edit',{order:o});setNet(true);const old=ORD.find(x=>x.id===o.id);if(old)reserve(old,-1);reserve(o,1);
-      const i=ORD.findIndex(x=>x.id===o.id);if(i>=0)ORD[i]=r.order;
+      const i=ORD.findIndex(x=>x.id===o.id);if(i>=0)ORD[i]=Object.assign({},r.order,{_d:ORD[i]._d||r.order.date});
       toast(`Buyurtma ${r.order.no} o'zgartirildi · ${fmt(r.order.total)}`);F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(r.order,true)}
     catch(e){toast(e.net?"Internet yo'q — o'zgarish saqlanmadi, internet qaytgach yana «O'zgarishlarni saqlash» ni bosing":e.message,true);if(e.net)setNet(false);if(e.auth)setTimeout(()=>setupScreen(e.message),1500)}
     finally{saving=false;const b=$('#zSave');if(b)b.disabled=!F.lines.length}
@@ -433,24 +440,27 @@ function pdfModal(o,edited){
   $('#pdfDl',ov).onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Tayyorlanmoqda…';try{await orderPdf(o);close()}catch(err){toast("PDF tayyorlanmadi — «Chop etish» → «PDF sifatida saqlash» ni tanlang",true);b.disabled=false;b.textContent='PDF yuklab olish'}}}
 function viewToday(pend){
   $('#bar').innerHTML='';
-  const all=ORD.slice().reverse();const base=MINE?all.filter(o=>o.seller===SELLER):all;
+  const all=ORD.slice().sort((a,b)=>String(b._d||'').localeCompare(String(a._d||''))||String(b.time||'').localeCompare(String(a.time||'')));const base=MINE?all.filter(o=>o.seller===SELLER):all;
   const act=base.filter(o=>o.status!=='cancelled');const cash=act.filter(o=>o.pay==='cash').reduce((a,o)=>a+num(o.total),0),debt=act.filter(o=>o.pay==='debt').reduce((a,o)=>a+num(o.total),0);
   const nWait=act.filter(o=>!o.delivered).length,nDone=act.filter(o=>o.delivered).length;
   const L=base.filter(o=>DF==='all'||(DF==='wait'?o.status!=='cancelled'&&!o.delivered:o.status!=='cancelled'&&o.delivered));
   $('#main').innerHTML=`${pend}${LIST_ERR?`<div class="pend">${esc(LIST_ERR)}</div>`:''}<div class="seg" style="margin-bottom:10px"><button data-mine="1" class="${MINE?'on':''}">Meniki (${esc(SELLER)})</button><button data-mine="0" class="${!MINE?'on':''}">Hamma sotuvchilar</button></div>
    <div class="stats"><div><small>Buyurtmalar</small><b>${act.length}</b></div><div><small>Naqd olindi</small><b>${fmt(cash)}</b></div><div><small>Qarzga</small><b>${fmt(debt)}</b></div></div>
    <div class="seg" style="margin-bottom:12px"><button data-df="all" class="${DF==='all'?'on':''}">Hammasi</button><button data-df="wait" class="${DF==='wait'?'on':''}">Berilmagan (${nWait})</button><button data-df="done" class="${DF==='done'?'on':''}">Chiqarildi (${nDone})</button></div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0">${VD===today()?'Bugun, ':''}${dmy(VD)}</h3><button class="btn sm" id="zRef">Yangilash</button></div>
-   <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><button class="btn sm" id="zDPrev" title="Oldingi kun">◀</button><input type="date" id="zD" value="${VD}" max="${today()}" style="flex:1;padding:7px 10px"><button class="btn sm" id="zDNext" title="Keyingi kun" ${VD>=today()?'disabled':''}>▶</button>${VD===today()?'':'<button class="btn sm" id="zDToday">Bugun</button>'}</div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${VR===1?(VD===today()?'Bugun, ':'')+dmy(VD):dmy(shiftDay(VD,-(VR-1)))+' — '+dmy(VD)}</h3><button class="btn sm" id="zRef">Yangilash</button></div>
+   <div class="seg" style="margin-bottom:8px">${[[1,'1 kun'],[3,'3 kun'],[7,'7 kun'],[30,'30 kun']].map(([n,l])=>`<button data-vr="${n}" class="${VR===n?'on':''}">${l}</button>`).join('')}</div>
+   <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><button class="btn sm" id="zDPrev" title="Oldingi kun">◀</button><input type="date" id="zD" value="${VD}" max="${today()}" style="flex:1;padding:7px 10px" title="Oxirgi kun"><button class="btn sm" id="zDNext" title="Keyingi kun" ${VD>=today()?'disabled':''}>▶</button>${VD===today()?'':'<button class="btn sm" id="zDToday">Bugun</button>'}</div>
+   <p class="hint" style="margin:0 0 6px">Eski kunlardagi buyurtmalarni ham shu yerda ochib, «O'zgartirish» bilan tahrirlash mumkin.</p>
    ${linked()?`<p class="hint" style="margin:0 0 6px">Buyurtma Hed balansda sotuvga aylantirilganda o'zi «Chiqarildi» bo'ladi.</p>`:''}
-   <div class="list">${L.length?L.map(o=>{const c=o.status==='cancelled';const sale=/^Sotuv /.test(o.balans||'')?o.balans:'';return `<div class="item" style="align-items:flex-start"><div class="nm"><b>${esc(o.no)} · ${esc(o.client||'Naqd mijoz')}</b><small>${esc(o.time||'')}${o.seller?' · '+esc(o.seller):''} · ${o.lines.length} ta mahsulot${o.note?' · '+esc(o.note):''}</small>
+   <div class="list">${L.length?L.map((o,ix)=>{const c=o.status==='cancelled';const sale=/^Sotuv /.test(o.balans||'')?o.balans:'';const hd=VR>1&&(ix===0||L[ix-1]._d!==o._d)?`<div style="padding:10px 2px 4px;font-weight:700;color:var(--ink2);font-size:13px;border-bottom:1px solid var(--line)">${o._d===today()?'Bugun, ':''}${dmy(o._d)} · ${L.filter(x=>x._d===o._d&&x.status!=='cancelled').length} ta</div>`:'';return hd+`<div class="item" style="align-items:flex-start"><div class="nm"><b>${esc(o.no)} · ${esc(o.client||'Naqd mijoz')}</b><small>${esc(o.time||'')}${o.seller?' · '+esc(o.seller):''} · ${o.lines.length} ta mahsulot${o.note?' · '+esc(o.note):''}</small>
      <small style="display:block">${o.lines.map(l=>esc(l.name)+' × '+l.qty).join(', ')}</small>
      ${!c?(o.delivered?`<small style="display:block;margin-top:4px"><span class="tag ok">✓ Chiqarildi</span>${sale?' '+esc(sale):''}</small>`:`<small style="display:block;margin-top:4px"><span class="tag warn">Hali berilmagan</span>${o.balans==='Kutilmoqda'?' <span class="tag">balansga yuborilmoqda</span>':/^Xato/.test(o.balans||'')?' <span class="tag bad">'+esc(o.balans)+'</span>':''}</small>`):''}</div>
      <div style="text-align:right;flex:none"><b ${c?'style="text-decoration:line-through"':''}>${fmt(o.total)}</b><br>${c?'<span class="tag bad">Bekor</span>':o.pay==='debt'?'<span class="tag warn">Qarzga</span>':'<span class="tag ok">Naqd</span>'}
      ${c?`<br><button class="btn sm" style="margin-top:6px;color:var(--bad)" data-rm="${esc(o.id)}" title="Jadvaldan butunlay o'chirish">O'chirish</button>`:`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun buyurtma varaqasi (PDF)">PDF</button>`}
-     ${c?'':o.delivered?(linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`):`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda buyurtma yo'q.":VD===today()?"Bugun hali buyurtma yo'q.":"Bu kuni buyurtma bo'lmagan."}</p>`}</div></div>`;
+     ${c?'':o.delivered?`${linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}`:`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda buyurtma yo'q.":VR>1?"Bu kunlarda buyurtma bo'lmagan.":VD===today()?"Bugun hali buyurtma yo'q.":"Bu kuni buyurtma bo'lmagan."}</p>`}</div></div>`;
   $('#zRef').onclick=()=>loadToday();
   const goD=d=>{if(!d||d>today())return;VD=d;ORD=[];LIST_ERR='';render();loadToday()};
+  $$('[data-vr]').forEach(b=>b.onclick=()=>{VR=+b.dataset.vr;lsSet('hz_range',VR);ORD=[];render();loadToday()});
   $('#zDPrev').onclick=()=>goD(shiftDay(VD,-1));$('#zDNext').onclick=()=>goD(shiftDay(VD,1));$('#zD').onchange=e=>goD(e.target.value);if($('#zDToday'))$('#zDToday').onclick=()=>goD(today());
   $$('[data-mine]').forEach(b=>b.onclick=()=>{MINE=b.dataset.mine==='1';render()});
   $$('[data-df]').forEach(b=>b.onclick=()=>{DF=b.dataset.df;render()});
@@ -462,7 +472,7 @@ function viewToday(pend){
     F={pay:o.pay==='debt'?'debt':'cash',cid:'',client:o.client==='Naqd mijoz'?'':(o.client||''),phone:o.phone||'',note:o.note||'',id:o.id,edit:{no:o.no,date:o.date,time:o.time,seller:o.seller},
       lines:(o.lines||[]).map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',name:l.name,qty:num(l.qty),price:num(l.price)}:{src:l.src==='calc'?'calc':'manual',cat:l.cat||'',name:l.name,qty:num(l.qty),price:num(l.price)})};
     saveDraft();tab='new';render();window.scrollTo(0,0)});
-  const upd=r=>{const i=ORD.findIndex(x=>x.id===r.order.id);if(i>=0)ORD[i]=r.order;render()};
+  const upd=r=>{const i=ORD.findIndex(x=>x.id===r.order.id);if(i>=0)ORD[i]=Object.assign({},r.order,{_d:ORD[i]._d||r.order.date});render()};
   const setDel=async(id,on)=>{try{const r=await api('deliver',{id,on});upd(r);toast(on?`${r.order.no} — chiqarildi`:`${r.order.no} — berilmagan`)}catch(e){toast(e.net?"Internet yo'q — keyinroq belgilang":e.message,true)}};
   $$('[data-del]').forEach(b=>b.onclick=()=>setDel(b.dataset.del,true));
   $$('[data-undel]').forEach(b=>b.onclick=()=>{if(confirm('Buyurtma «hali berilmagan» deb qaytarilsinmi?'))setDel(b.dataset.undel,false)});
