@@ -88,6 +88,7 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .xlt tfoot td b{font-size:17px}
 .xlt tr.lr:nth-child(even) td:not(.xn){background:rgba(127,127,127,.04)}
 .xlt .low{display:block;color:var(--bad);font-size:11px}
+.xlt td[tabindex]{cursor:default}.xlt td[tabindex]:focus{outline:2px solid var(--acc);outline-offset:-2px;background:var(--soft)}
 .muted{color:var(--ink2)}
 .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--accSoft);color:var(--ink)}
 .tag.ok{background:var(--okSoft);color:var(--ok)}.tag.warn{background:var(--warnSoft);color:var(--warn)}.tag.bad{background:var(--badSoft);color:var(--bad)}
@@ -277,10 +278,10 @@ function viewNew(pend){
   <div class="card"><h3 style="display:flex;justify-content:space-between;align-items:center;gap:8px">Mahsulotlar <small class="muted" id="zCat" style="font-weight:400">${catInfo()}</small></h3>
     <div class="xl"><table class="xlt"><thead><tr><th class="xn">№</th><th>Mahsulot nomi</th><th class="xr c-p">Narx</th><th class="xc c-q">Soni</th><th class="xr c-s">Jami</th><th class="c-x"></th></tr></thead><tbody>
     ${F.lines.map((l,i)=>{const p=P[l.pid];const low=p&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001&&INIT.minPriceCheck!==false;
-      return `<tr class="lr"><td class="xn">${i+1}</td><td class="c-n">${l.pid?`<b>${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" value="${esc(l.name)}" placeholder="Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi">`:`<b>${esc(l.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(l.cat||'')}</small>`}${low?`<small class="low">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</td>
-      <td class="c-p"><input type="text" inputmode="decimal" data-pr="${i}" value="${l.price}" aria-label="Narx"></td>
-      <td class="c-q"><div class="qty"><button data-dec="${i}" aria-label="Kamaytirish">−</button><input type="text" inputmode="decimal" data-q="${i}" value="${l.qty}" aria-label="Soni"><button data-inc="${i}" aria-label="Ko'paytirish">+</button></div></td>
-      <td class="c-s"><b data-sum="${i}">${fmt(lineSum(l))}</b></td>
+      return `<tr class="lr"><td class="xn">${i+1}</td><td class="c-n" ${l.src==='manual'?'':`tabindex="0" data-cell="${i}:nm"`}>${l.pid?`<b>${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" data-cell="${i}:nm" value="${esc(l.name)}" placeholder="Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi">`:`<b>${esc(l.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(l.cat||'')}</small>`}${low?`<small class="low">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</td>
+      <td class="c-p"><input type="text" inputmode="decimal" data-pr="${i}" data-cell="${i}:pr" value="${l.price}" aria-label="Narx"></td>
+      <td class="c-q"><div class="qty"><button data-dec="${i}" aria-label="Kamaytirish">−</button><input type="text" inputmode="decimal" data-q="${i}" data-cell="${i}:q" value="${l.qty}" aria-label="Soni"><button data-inc="${i}" aria-label="Ko'paytirish">+</button></div></td>
+      <td class="c-s" tabindex="0" data-cell="${i}:s"><b data-sum="${i}">${fmt(lineSum(l))}</b></td>
       <td class="c-x"><button type="button" data-rml="${i}" title="Qatorni o'chirish" aria-label="Qatorni o'chirish">×</button></td></tr>`}).join('')}
     <tr class="xnew"><td class="xn">${F.lines.length+1}</td><td class="c-n" colspan="5" style="padding:0"><div class="xsearch"><input type="search" id="zQ" placeholder="${linked()?'Mahsulot nomi, artikul yoki shtrix-kodni yozing…':'Mahsulot nomini yozing…'}" autocomplete="off"></div></td></tr><tr class="xres"><td colspan="6"><div id="zRes"></div></td></tr>
     </tbody><tfoot><tr><td colspan="4" id="zLf">Jami: ${F.lines.length} xil, ${r2(F.lines.reduce((a,l)=>a+num(l.qty),0))} dona</td><td class="c-s"><b>${fmt(total())}</b></td><td></td></tr></tfoot></table></div>
@@ -304,9 +305,10 @@ function viewNew(pend){
     $$('[data-manual]',bx).forEach(x=>x.onclick=()=>addManual(raw))};
   $('#zMan').onclick=()=>addManual('');
   q.onkeydown=e=>{const items=$$('#zRes .item');let si=items.findIndex(x=>x.classList.contains('sel'));
-    if(e.key==='ArrowDown'&&!items.length&&F.lines.length){e.preventDefault();return focusField(0,'pr')}
+    if(e.key==='ArrowDown'&&!items.length&&F.lines.length){e.preventDefault();return focusCell(0,NAVCOL)}
+    if(e.key==='ArrowUp'&&!items.length){e.preventDefault();if(F.lines.length)focusCell(F.lines.length-1,NAVCOL);return}
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!items.length)return;e.preventDefault();si=e.key==='ArrowDown'?(si+1)%items.length:(si<=0?items.length-1:si-1);items.forEach((x,k)=>x.classList.toggle('sel',k===si));items[si].scrollIntoView({block:'nearest'});return}
-    if(e.key==='ArrowRight'&&q.selectionEnd===q.value.length&&F.lines.length){e.preventDefault();focusField(F.lines.length-1,'pr');return}
+    if(e.key==='ArrowRight'&&!q.value&&F.lines.length){e.preventDefault();focusCell(F.lines.length-1,'pr');return}
     if(e.key==='Escape'){q.value='';$('#zRes').innerHTML='';return}
     if(e.key!=='Enter')return;e.preventDefault();const t=q.value.trim().toLowerCase();
     if(!t){addManual('');return}   // bo'sh qidiruvda Enter — yangi qo'lda qator
@@ -314,19 +316,8 @@ function viewNew(pend){
     const ex=prods().find(p=>(p.barcode&&String(p.barcode).toLowerCase()===t)||(p.sku&&String(p.sku).toLowerCase()===t));const first=sel||$('#zRes [data-add], #zRes [data-calc]');let li=-1;
     if(ex){addLine(ex.id);li=F.lines.findIndex(l=>l.pid===ex.id)}else if(first&&first.dataset.add){addLine(first.dataset.add);li=F.lines.findIndex(l=>l.pid===first.dataset.add)}else if(first&&first.dataset.calc){const c=CALC.find(x=>x.key===first.dataset.calc);addCalc(first.dataset.calc);if(c)li=F.lines.findIndex(l=>!l.pid&&l.src==='calc'&&norm(l.name)===norm(c.name))}else{addManual(q.value.trim());return}   // topilmasa — shu nom bilan qo'lda qator
     if(li>=0)focusField(li,'pr');else{const nq=$('#zQ');if(nq)nq.focus()}};
-  // qator ichida klaviatura — Excel kabi: ← → ↑ ↓ katakdan katakka (nom/narx/soni, qatorlar), Tab / Shift+Tab, Enter — pastga (oxirida yangi qator), Esc — qidiruvga
-  $$('[data-nm],[data-pr],[data-q]').forEach(x=>x.onkeydown=e=>{const f=x.dataset.nm!=null?'nm':x.dataset.pr!=null?'pr':'q';const i=+x.dataset[f];const order=['nm','pr','q'];
-    const has=(j,k)=>!!$(`[data-${k}="${j}"]`);const cols=j=>order.filter(k=>has(j,k));
-    const toSearch=()=>{const nq=$('#zQ');if(nq){nq.focus();nq.select()}};
-    const go=fn=>{e.preventDefault();commit(x);setTimeout(fn,40)};
-    if(e.key==='Escape')return go(toSearch);
-    if(e.key==='Enter'||(e.key==='ArrowDown'&&!e.altKey)){const l=F.lines[i],man=l&&l.src==='manual';return go(()=>{if(e.key==='Enter'&&man&&F.lines[i]&&!F.lines[i].name)return focusField(i,'nm');   // nomsiz qator — avval nom
-      const j=i+1;if(j<F.lines.length)return focusField(j,has(j,f)?f:'pr');if(e.key==='Enter'&&man)return addManual('');toSearch()})}
-    if(e.key==='ArrowUp')return go(()=>{const j=i-1;if(j<0)return toSearch();focusField(j,has(j,f)?f:'pr')});
-    if(e.key==='ArrowRight'||(e.key==='Tab'&&!e.shiftKey)){const c=cols(i),n=c[c.indexOf(f)+1];return go(()=>{if(n)return focusField(i,n);if(e.key==='Tab'){const j=i+1;if(j<F.lines.length)return focusField(j,cols(j)[0]);return toSearch()}})}
-    if(e.key==='ArrowLeft'||(e.key==='Tab'&&e.shiftKey)){const c=cols(i),n=c[c.indexOf(f)-1];return go(()=>{if(n)return focusField(i,n);if(e.key==='Tab'&&i>0){const cj=cols(i-1);return focusField(i-1,cj[cj.length-1])}toSearch()})}
-    if(e.key==='Home'&&e.ctrlKey)return go(toSearch);
-    if(e.key==='End'&&e.ctrlKey)return go(()=>{const j=F.lines.length-1;const cj=cols(j);focusField(j,cj[cj.length-1])})});
+  // Excel kabi katak navigatsiyasi: ← → ↑ ↓, Tab / Shift+Tab, Enter — pastga (oxirida qidiruv qatori), Esc — qidiruvga; nom va jami kataklari ham tanlanadi
+  $$('[data-cell]').forEach(x=>{x.onkeydown=gridKey;x.addEventListener('focus',()=>{NAVCOL=x.dataset.cell.split(':')[1]})});
   $$('[data-nm]').forEach(x=>x.onchange=()=>{F.lines[+x.dataset.nm].name=x.value.trim().replace(/\s+/g,' ');saveDraft()});
   $$('[data-rml]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rml;F.lines.splice(i,1);saveDraft();render();setTimeout(()=>{if(F.lines[i])focusField(i,'pr');else if(F.lines.length)focusField(F.lines.length-1,'pr');else{const nq=$('#zQ');if(nq)nq.focus()}},30)});
   $$('[data-inc]').forEach(b=>b.onclick=()=>{const l=F.lines[+b.dataset.inc];l.qty=r2(num(l.qty)+1);saveDraft();render()});
@@ -344,6 +335,22 @@ function updTotals(){ // narx/son o'zgarganda butun sahifani qayta chizmasdan ja
   const sm=$('#zSum');if(sm)sm.innerHTML=sumHTML()}
 function commit(el){if(el&&el.onchange)el.dispatchEvent(new Event('change'))}   // yozilgan qiymatni darhol hisobga olish
 function focusField(i,k){const el=$(`[data-${k}="${i}"]`);if(el){el.focus();if(el.select)el.select();el.scrollIntoView({block:'nearest'})}}
+const GCOLS=['nm','pr','q','s'];let NAVCOL='pr';
+function focusCell(i,k){if(i>=F.lines.length||i<0){const nq=$('#zQ');if(nq){nq.focus();nq.select()}return}
+  let el=$(`[data-cell="${i}:${k}"]`);if(!el)el=$(`[data-cell="${i}:pr"]`);if(!el)return;el.focus();if(el.select)el.select();el.scrollIntoView({block:'nearest'})}
+function gridKey(e){const x=e.currentTarget;const [is,k]=x.dataset.cell.split(':');const i=+is;const ci=GCOLS.indexOf(k);const isIn=x.tagName==='INPUT';
+  const toSearch=()=>{const nq=$('#zQ');if(nq){nq.focus();nq.select()}};
+  const go=fn=>{e.preventDefault();if(isIn)commit(x);setTimeout(fn,40)};
+  const cols=j=>GCOLS.filter(c=>$(`[data-cell="${j}:${c}"]`));
+  if(e.key==='Escape')return go(toSearch);
+  if(e.key==='Enter'||(e.key==='ArrowDown'&&!e.altKey)){const l=F.lines[i],man=l&&l.src==='manual';return go(()=>{if(e.key==='Enter'&&man&&F.lines[i]&&!F.lines[i].name)return focusCell(i,'nm');
+    const j=i+1;if(j<F.lines.length)return focusCell(j,k);if(e.key==='Enter'&&man)return addManual('');toSearch()})}
+  if(e.key==='ArrowUp')return go(()=>{const j=i-1;if(j<0)return toSearch();focusCell(j,k)});
+  if(e.key==='ArrowRight'||(e.key==='Tab'&&!e.shiftKey)){const n=GCOLS[ci+1];return go(()=>{if(n&&$(`[data-cell="${i}:${n}"]`))return focusCell(i,n);if(e.key==='Tab'){const j=i+1;if(j<F.lines.length)return focusCell(j,cols(j)[0]);return toSearch()}})}
+  if(e.key==='ArrowLeft'||(e.key==='Tab'&&e.shiftKey)){const n=GCOLS[ci-1];return go(()=>{if(n&&$(`[data-cell="${i}:${n}"]`))return focusCell(i,n);if(e.key==='Tab'){if(i>0){const cj=cols(i-1);return focusCell(i-1,cj[cj.length-1])}toSearch()}})}
+  if(e.key==='Home'&&e.ctrlKey)return go(toSearch);
+  if(e.key==='End'&&e.ctrlKey)return go(()=>{const j=F.lines.length-1;const cj=cols(j);focusCell(j,cj[cj.length-1])});
+  if(!isIn&&(e.key==='Delete'||e.key==='Backspace')){e.preventDefault();const b=$(`[data-rml="${i}"]`);if(b)b.click()}}
 function addCalc(key){const c=CALC.find(x=>x.key===key);if(!c)return;const ex=F.lines.find(l=>!l.pid&&l.src==='calc'&&norm(l.name)===norm(c.name));
   if(ex)ex.qty=r2(num(ex.qty)+1);else F.lines.push({src:'calc',cat:c.cat,name:c.name,qty:1,price:c.price});saveDraft();render();toast(c.name+' qo\'shildi')}
 function addManual(name){F.lines.push({src:'manual',name:name,qty:1,price:0});saveDraft();render();const i=F.lines.length-1;setTimeout(()=>{const el=$(name?`[data-pr="${i}"]`:`[data-nm="${i}"]`);if(el){el.focus();if(el.select)el.select()}},30)}
