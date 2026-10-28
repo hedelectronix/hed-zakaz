@@ -67,7 +67,7 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .xlt th{background:var(--soft);color:var(--ink2);font-size:12px;font-weight:700;text-transform:none;padding:6px 8px;text-align:left}
 .xlt td.xn,.xlt th.xn{width:40px;text-align:center;background:var(--soft);color:var(--ink2);font-size:12px;font-weight:700}
 .xlt th.xr,.xlt td.c-s{text-align:right}.xlt th.xc{text-align:center}
-.xlt .c-p{width:108px}.xlt .c-q{width:118px}.xlt .c-s{width:112px;padding:0 8px;font-weight:700}.xlt .c-x{width:34px;text-align:center}
+.xlt .c-p{width:108px}.xlt .c-q{width:84px}.xlt .c-s{width:112px;padding:0 8px;font-weight:700}.xlt .c-x{width:34px;text-align:center}
 .xlt td.c-n{padding:5px 8px;min-width:0}
 .xlt .c-n b{display:block;font-weight:600;overflow-wrap:anywhere;line-height:1.25}
 .xlt .c-n small{display:block;color:var(--ink2);font-size:11px;line-height:1.2}
@@ -287,7 +287,7 @@ function viewNew(pend){
     ${F.lines.map((l,i)=>{const p=P[l.pid];const low=p&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001&&INIT.minPriceCheck!==false;
       return `<tr class="lr"><td class="xn">${i+1}</td><td class="c-n" ${l.src==='manual'?'':`tabindex="0" data-cell="${i}:nm"`}>${l.pid?`<b>${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" data-cell="${i}:nm" value="${esc(l.name)}" placeholder="Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi">`:`<b>${esc(l.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(l.cat||'')}</small>`}${low?`<small class="low">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</td>
       <td class="c-p"><input type="text" inputmode="decimal" data-pr="${i}" data-cell="${i}:pr" value="${l.price}" aria-label="Narx"></td>
-      <td class="c-q"><div class="qty"><button data-dec="${i}" aria-label="Kamaytirish">−</button><input type="text" inputmode="decimal" data-q="${i}" data-cell="${i}:q" value="${l.qty}" aria-label="Soni"><button data-inc="${i}" aria-label="Ko'paytirish">+</button></div></td>
+      <td class="c-q"><input type="text" inputmode="decimal" data-q="${i}" data-cell="${i}:q" value="${l.qty}" aria-label="Soni" style="text-align:center;font-variant-numeric:tabular-nums"></td>
       <td class="c-s" tabindex="0" data-cell="${i}:s"><b data-sum="${i}">${fmt(lineSum(l))}</b></td>
       <td class="c-x"><button type="button" data-rml="${i}" title="Qatorni o'chirish" aria-label="Qatorni o'chirish">×</button></td></tr>`}).join('')}
     <tr class="xnew"><td class="xn">${F.lines.length+1}</td><td class="c-n" colspan="5" style="padding:0"><div class="xsearch"><input type="search" id="zQ" placeholder="${linked()?'Mahsulot nomi, artikul yoki shtrix-kodni yozing…':'Mahsulot nomini yozing…'}" autocomplete="off"></div></td></tr><tr class="xres"><td colspan="6"><div id="zRes"></div></td></tr>
