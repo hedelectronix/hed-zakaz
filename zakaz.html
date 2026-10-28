@@ -41,6 +41,8 @@ header{position:sticky;top:0;z-index:5;background:var(--hdrBg);border-bottom:1px
 .tabs{display:flex;gap:6px;margin-top:10px}
 .tabs button{flex:1;border:0;background:transparent;color:var(--ink2);padding:10px 6px;font-weight:700;border-bottom:3px solid transparent}
 .tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
+.tabs button.tab-pri{background:var(--acc);color:var(--accInk);border-radius:10px;border-bottom:0;margin:4px 0;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.tabs button.tab-pri.on{background:var(--acc);color:var(--accInk);outline:2px solid var(--ink);outline-offset:-2px}
 main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 .card h3{margin:0 0 10px;font-size:15px}
@@ -257,7 +259,7 @@ function boot(){
   if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
   $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed buyurtma</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
      <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
-   <div class="tabs"><button data-tab="new">Yangi buyurtma</button><button data-tab="today">Buyurtmalar</button></div></header><main id="main"></main><div id="bar"></div>`;
+   <div class="tabs"><button data-tab="new" class="tab-pri">＋ Yangi buyurtma</button><button data-tab="today">Buyurtmalar ro'yxati</button></div></header><main id="main"></main><div id="bar"></div>`;
   $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
   $('#whoBtn').onclick=sellerScreen;
   $('#setBtn').onclick=()=>{if(confirm("Ulanish sozlamalari (Google skript manzili va PIN) qayta kiritilsinmi?"))setupScreen()};
@@ -439,7 +441,7 @@ function pdfModal(o,edited){
   $('#pdfPr',ov).onclick=()=>orderPrint(o);
   $('#pdfDl',ov).onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Tayyorlanmoqda…';try{await orderPdf(o);close()}catch(err){toast("PDF tayyorlanmadi — «Chop etish» → «PDF sifatida saqlash» ni tanlang",true);b.disabled=false;b.textContent='PDF yuklab olish'}}}
 function viewToday(pend){
-  $('#bar').innerHTML='';
+  $('#bar').innerHTML=`<div class="sticky"><div class="in"><button class="btn pri" id="goNew" style="width:100%;font-size:17px;padding:14px">＋ Yangi buyurtma yozish</button></div></div>`;$('#goNew').onclick=()=>{tab='new';render();window.scrollTo(0,0);setTimeout(()=>{const nq=$('#zQ');if(nq)nq.focus()},50)};
   const all=ORD.slice().sort((a,b)=>String(b._d||'').localeCompare(String(a._d||''))||String(b.time||'').localeCompare(String(a.time||'')));const base=MINE?all.filter(o=>o.seller===SELLER):all;
   const act=base.filter(o=>o.status!=='cancelled');const cash=act.filter(o=>o.pay==='cash').reduce((a,o)=>a+num(o.total),0),debt=act.filter(o=>o.pay==='debt').reduce((a,o)=>a+num(o.total),0);
   const nWait=act.filter(o=>!o.delivered).length,nDone=act.filter(o=>o.delivered).length;
