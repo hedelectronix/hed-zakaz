@@ -258,7 +258,7 @@ function sellerScreen(){
 function boot(){
   if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
   $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed buyurtma</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
-     <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="refBtn" title="Yangilash — eng so'nggi versiyani yuklash" aria-label="Yangilash" onclick="this.disabled=true;this.textContent='…';(async()=>{try{for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.reload()})()">↻ Refresh</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
+     <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="cardBtn" title="Karta raqami" aria-label="Karta raqami" onclick="hzCard()">💳</button><button class="btn sm" id="refBtn" title="Yangilash — eng so'nggi versiyani yuklash" aria-label="Yangilash" onclick="this.disabled=true;this.textContent='…';(async()=>{try{for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.reload()})()">↻ Refresh</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
    <div class="tabs"><button data-tab="new" class="tab-pri">＋ Yangi buyurtma</button><button data-tab="today">Buyurtmalar ro'yxati</button></div></header><main id="main"></main><div id="bar"></div>`;
   $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
   $('#whoBtn').onclick=sellerScreen;
@@ -454,6 +454,24 @@ function pdfModal(o,edited){
   ov.onclick=e=>{if(e.target===ov)close()};$('#pdfX',ov).onclick=close;
   $('#pdfPr',ov).onclick=()=>orderPrint(o);
   $('#pdfDl',ov).onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Tayyorlanmoqda…';try{await orderPdf(o);close()}catch(err){toast("PDF tayyorlanmadi — «Chop etish» → «PDF sifatida saqlash» ni tanlang",true);b.disabled=false;b.textContent='PDF yuklab olish'}}}
+function hzCard(){
+ let c={};try{c=JSON.parse(localStorage.getItem('hz_card')||'{}')}catch(e){}
+ const old=document.getElementById('hzCardM'); if(old) old.remove();
+ const m=document.createElement('div'); m.id='hzCardM';
+ m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;display:flex;align-items:center;justify-content:center;padding:16px';
+ m.innerHTML='<div style="background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;max-width:380px"><h3 style="margin:0 0 10px">Karta raqami</h3><input id="hcN" inputmode="numeric" maxlength="23" placeholder="0000 0000 0000 0000" style="width:100%;margin-bottom:8px;font-size:18px"><input id="hcO" placeholder="Karta egasi (ixtiyoriy)" style="width:100%;margin-bottom:12px"><div style="display:flex;gap:8px"><button class="btn pri" id="hcC" style="flex:1">Nusxalash</button><button class="btn" id="hcS" style="flex:1">Saqlash</button><button class="btn" id="hcX">✕</button></div><small id="hcMsg" style="display:block;margin-top:8px;color:var(--ink2)"></small></div>';
+ document.body.appendChild(m);
+ const n=m.querySelector('#hcN'),o=m.querySelector('#hcO'),msg=m.querySelector('#hcMsg');
+ n.value=c.n||'';o.value=c.o||'';
+ const f4=s=>s.replace(/\D/g,'').slice(0,19).replace(/(.{4})/g,'$1 ').trim();
+ n.oninput=()=>{n.value=f4(n.value)};
+ const save=()=>{try{localStorage.setItem('hz_card',JSON.stringify({n:n.value,o:o.value}))}catch(e){}};
+ m.querySelector('#hcS').onclick=()=>{save();msg.textContent='Saqlandi ✓'};
+ m.querySelector('#hcC').onclick=async()=>{save();const txt=n.value+(o.value?'\n'+o.value:'');try{await navigator.clipboard.writeText(txt)}catch(e){n.select();document.execCommand('copy')}msg.textContent='Nusxalandi ✓'};
+ m.querySelector('#hcX').onclick=()=>m.remove();
+ m.onclick=e=>{if(e.target===m)m.remove()};
+ setTimeout(()=>n.focus(),50);
+}
 function viewToday(pend){
   $('#bar').innerHTML=`<div class="sticky"><div class="in"><button class="btn pri" id="goNew" style="width:100%;font-size:17px;padding:14px">＋ Yangi buyurtma yozish</button></div></div>`;$('#goNew').onclick=()=>{tab='new';render();window.scrollTo(0,0);setTimeout(()=>{const nq=$('#zQ');if(nq)nq.focus()},50)};
   const all=ORD.slice().sort((a,b)=>String(b._d||'').localeCompare(String(a._d||''))||String(b.time||'').localeCompare(String(a.time||'')));const base=MINE?all.filter(o=>o.seller===SELLER):all;
