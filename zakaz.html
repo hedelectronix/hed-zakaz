@@ -259,7 +259,7 @@ function boot(){
   if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
   $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed buyurtma</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
      <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="cardBtn" title="Karta raqami" aria-label="Karta raqami" onclick="hzCard()">💳</button><button class="btn sm" id="refBtn" title="Yangilash — eng so'nggi versiyani yuklash" aria-label="Yangilash" onclick="this.disabled=true;this.textContent='…';(async()=>{try{for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.reload()})()">↻ Refresh</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
-   <div class="tabs"><button data-tab="new" class="tab-pri">＋ Yangi buyurtma</button><button data-tab="today">Buyurtmalar ro'yxati</button></div></header><main id="main"></main><div id="bar"></div>`;
+   <div class="tabs"><button data-tab="new" class="tab-pri">＋ Yangi buyurtma</button><button data-tab="today">Buyurtmalar ro'yxati</button></div><div id="hzCS">${cardStrip()}</div></header><main id="main"></main><div id="bar"></div>`;
   $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
   $('#whoBtn').onclick=sellerScreen;
   $('#setBtn').onclick=()=>{if(confirm("Ulanish sozlamalari (Google skript manzili va PIN) qayta kiritilsinmi?"))setupScreen()};
@@ -454,6 +454,8 @@ function pdfModal(o,edited){
   ov.onclick=e=>{if(e.target===ov)close()};$('#pdfX',ov).onclick=close;
   $('#pdfPr',ov).onclick=()=>orderPrint(o);
   $('#pdfDl',ov).onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Tayyorlanmoqda…';try{await orderPdf(o);close()}catch(err){toast("PDF tayyorlanmadi — «Chop etish» → «PDF sifatida saqlash» ni tanlang",true);b.disabled=false;b.textContent='PDF yuklab olish'}}}
+function cardStrip(){let c={};try{c=JSON.parse(localStorage.getItem('hz_card')||'{}')}catch(e){}if(!c.n)return '';return '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--line);flex-wrap:wrap"><span>💳</span><b style="font-size:16px;letter-spacing:.5px">'+esc(c.n)+'</b>'+(c.o?'<small style="color:var(--ink2)">'+esc(c.o)+'</small>':'')+'<span style="flex:1"></span><button class="btn sm" onclick="hzCopy(this)">Nusxalash</button></div>'}
+async function hzCopy(b){let c={};try{c=JSON.parse(localStorage.getItem('hz_card')||'{}')}catch(e){}const txt=(c.n||'')+(c.o?'\n'+c.o:'');try{await navigator.clipboard.writeText(txt)}catch(e){const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}const o=b.textContent;b.textContent='Nusxalandi ✓';setTimeout(()=>{b.textContent=o},1500)}
 function hzCard(){
  let c={};try{c=JSON.parse(localStorage.getItem('hz_card')||'{}')}catch(e){}
  const old=document.getElementById('hzCardM'); if(old) old.remove();
@@ -465,7 +467,7 @@ function hzCard(){
  n.value=c.n||'';o.value=c.o||'';
  const f4=s=>s.replace(/\D/g,'').slice(0,19).replace(/(.{4})/g,'$1 ').trim();
  n.oninput=()=>{n.value=f4(n.value)};
- const save=()=>{try{localStorage.setItem('hz_card',JSON.stringify({n:n.value,o:o.value}))}catch(e){}};
+ const save=()=>{try{localStorage.setItem('hz_card',JSON.stringify({n:n.value,o:o.value}))}catch(e){}const s=document.getElementById('hzCS');if(s)s.innerHTML=cardStrip()};
  m.querySelector('#hcS').onclick=()=>{save();msg.textContent='Saqlandi ✓'};
  m.querySelector('#hcC').onclick=async()=>{save();const txt=n.value+(o.value?'\n'+o.value:'');try{await navigator.clipboard.writeText(txt)}catch(e){n.select();document.execCommand('copy')}msg.textContent='Nusxalandi ✓'};
  m.querySelector('#hcX').onclick=()=>m.remove();
