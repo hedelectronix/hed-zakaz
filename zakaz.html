@@ -259,17 +259,62 @@ function boot(){
   if(!SET)return setupScreen();if(!SELLER)return sellerScreen();
   $('#root').innerHTML=`<header><div class="hrow"><div><b>Hed buyurtma</b><small>${esc((INIT&&INIT.company)||'')}${linked()?' · Hed balans bilan bog\'langan':''}</small></div><span class="sp"></span><span id="net"></span>
      <button class="who" id="whoBtn" title="Sotuvchini almashtirish">${esc(SELLER)} ▾</button><button class="btn sm" id="cardBtn" title="Karta raqami" aria-label="Karta raqami" onclick="hzCard()">💳</button><button class="btn sm" id="refBtn" title="Yangilash — eng so'nggi versiyani yuklash" aria-label="Yangilash" onclick="this.disabled=true;this.textContent='…';(async()=>{try{for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.reload()})()">↻ Refresh</button><button class="btn sm" id="modeBtn" aria-label="Kunduzgi yoki tungi rejim">${document.documentElement.dataset.hbmode==='night'?'☀':'☾'}</button><button class="btn sm" id="setBtn" aria-label="Ulanish sozlamalari" title="Ulanish sozlamalari">⚙</button></div>
-   <div class="tabs"><button data-tab="new" class="tab-pri">＋ Yangi buyurtma</button><button data-tab="today">Buyurtmalar ro'yxati</button></div><div id="hzCS">${cardStrip()}</div></header><main id="main"></main><div id="bar"></div>`;
+   <div class="tabs"><button data-tab="new" class="tab-pri">＋ Yangi buyurtma</button><button data-tab="omb">Ombor</button><button data-tab="today">Buyurtmalar ro'yxati</button></div><div id="hzCS">${cardStrip()}</div></header><main id="main"></main><div id="bar"></div>`;
   $('#modeBtn').onclick=e=>{setMode(document.documentElement.dataset.hbmode==='night'?'day':'night');e.currentTarget.textContent=document.documentElement.dataset.hbmode==='night'?'☀':'☾'};
   $('#whoBtn').onclick=sellerScreen;
   $('#setBtn').onclick=()=>{if(confirm("Ulanish sozlamalari (Google skript manzili va PIN) qayta kiritilsinmi?"))setupScreen()};
   $$('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();if(tab==='today')loadToday()});
   setNet(ONLINE);render()}
+
+/* ---------- Omborchi ombori: ko'rish va buyurtmaga qo'shish ---------- */
+const OMB_URL='https://script.google.com/macros/s/AKfycby5ve51vCnSf5ZXTTQ8n3rqzTJPLj3afI1Bn-qYdq_SiX1O8zJzKBJq47ZOVRkYl7VH/exec';   // Omborchi serveri (ochiq, faqat o'qish)
+let OMB=lsGet('hz_omb',null),OMB_ERR='',OMB_Q='',OMB_C='',OMB_BUSY=false;
+async function loadOmb(){
+  if(OMB_BUSY)return;OMB_BUSY=true;OMB_ERR='';if(tab==='omb')render();
+  try{const r=await fetch(OMB_URL+'?q=stock',{cache:'no-store',redirect:'follow'});const j=await r.json();
+    if(!j||!Array.isArray(j.products))throw new Error('Ombor javobi tushunarsiz');
+    OMB={at:Date.now(),updated:j.updated||0,items:j.products.map(x=>({name:String(x.name||'').trim(),cat:String(x.cat||'').trim(),qty:num(x.qty),counted:String(x.counted||'')})).filter(x=>x.name)};lsSet('hz_omb',OMB)}
+  catch(e){OMB_ERR=OMB?"Yangilanmadi — oxirgi saqlangan ma'lumot ko'rsatilmoqda":"Ombor ma'lumoti yuklanmadi. Internetni tekshiring."}
+  OMB_BUSY=false;if(tab==='omb')render()}
+const ombFind=name=>OMB&&OMB.items.find(x=>norm(x.name)===norm(name));
+const ombTxt=l=>{const o=ombFind(l.name);if(!o)return '';return `Omborda: ${r2(o.qty)}${num(l.qty)>o.qty?' <span class="tag warn">yetmaydi</span>':''}`};
+function addOmb(name,qty){const o=ombFind(name);if(!o)return;qty=num(qty)>0?num(qty):1;
+  const ex=F.lines.find(l=>l.omb&&norm(l.name)===norm(name));
+  if(ex)ex.qty=r2(num(ex.qty)+qty);
+  else{const c=CALC.find(x=>norm(x.name)===norm(name)||norm(x.full)===norm(name));F.lines.push({src:'calc',omb:1,cat:o.cat,name:o.name,qty,price:c?c.price:0})}
+  saveDraft();toast(`${o.name} × ${qty} buyurtmaga qo'shildi`)}
+function viewOmb(){
+  if(!OMB||Date.now()-OMB.at>120000)loadOmb();
+  const items=OMB?OMB.items:[];const cats=[...new Set(items.map(x=>x.cat).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const words=norm(OMB_Q).split(' ').filter(Boolean);
+  const L=items.filter(x=>(!OMB_C||x.cat===OMB_C)&&words.every(w=>norm(x.name+' '+x.cat).includes(w)));
+  const when=OMB&&OMB.updated?new Date(OMB.updated).toLocaleString('ru-RU',{timeZone:'Asia/Tashkent',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  const cnt=OMB?[...new Set(OMB.items.map(x=>x.counted).filter(Boolean))].sort().pop():'';
+  const total=L.reduce((a,x)=>a+x.qty,0);
+  let rows='',lastCat=null;
+  for(const x of L){if(!OMB_C&&x.cat!==lastCat){lastCat=x.cat;rows+=`<tr><td colspan="4" style="background:var(--soft);font-weight:700;padding:6px 10px">${esc(x.cat||'Boshqa')}</td></tr>`}
+    const out=x.qty<=0;
+    rows+=`<tr class="lr"><td class="c-n"><b${out?' style="opacity:.55"':''}>${esc(x.name)}</b></td><td style="text-align:right;padding:0 8px;font-weight:700;font-variant-numeric:tabular-nums${out?';color:var(--bad)':''}">${out?'tugagan':r2(x.qty)}</td><td><input type="text" inputmode="decimal" value="1" data-oq="${esc(x.name)}" aria-label="Soni" style="text-align:center" ${out?'disabled':''}></td><td style="text-align:center"><button class="btn sm" data-oadd="${esc(x.name)}" title="Buyurtmaga qo'shish" aria-label="Buyurtmaga qo'shish" style="padding:6px 10px;font-weight:700" ${out?'disabled':''}>＋</button></td></tr>`}
+  $('#main').innerHTML=`${`<div id="pendBox">${pendHTML()}</div>`}<div class="card"><h3 style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Ombor qoldig'i <span style="display:flex;gap:8px;align-items:center"><small class="muted" style="font-weight:400">${OMB?`Sanoq: ${esc(cnt||'—')}${when?` · yangilandi: ${when}`:''}`:''}</small><button class="btn sm" id="oRef" ${OMB_BUSY?'disabled':''}>${OMB_BUSY?'…':'↻ Yangilash'}</button></span></h3>
+    ${OMB_ERR?`<div class="pend">${esc(OMB_ERR)}</div>`:''}
+    <div class="xsearch" style="margin:6px 0"><input type="search" id="oQ" value="${esc(OMB_Q)}" placeholder="Mahsulot nomini yozing…" autocomplete="off" style="width:100%"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px"><button class="btn sm ${OMB_C?'':'pri'}" data-oc="">Hammasi</button>${cats.map(c=>`<button class="btn sm ${OMB_C===c?'pri':''}" data-oc="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    ${OMB_BUSY&&!OMB?'<p class="muted">Yuklanmoqda…</p>':!items.length?'<p class="muted">Ma\'lumot yo\'q</p>':`<div class="xl"><table class="xlt" style="min-width:0"><thead><tr><th>Mahsulot</th><th class="xr" style="width:74px">Qoldiq</th><th class="xc" style="width:60px">Soni</th><th style="width:48px"></th></tr></thead><tbody>${rows||'<tr><td colspan="4" style="padding:12px;text-align:center" class="muted">Hech narsa topilmadi</td></tr>'}</tbody></table></div><p class="muted" style="margin:8px 0 0">Ko'rsatilgan: ${L.length} xil, jami ${r2(total)} dona</p>`}</div>`;
+  const nl=F.lines.length;
+  $('#bar').innerHTML=nl?`<div class="sticky"><div class="in"><button class="btn pri" id="oGo" style="width:100%;font-size:17px;padding:14px">Buyurtmaga o'tish (${nl} ta mahsulot)</button></div></div>`:'';
+  if($('#oGo'))$('#oGo').onclick=()=>{tab='new';render();window.scrollTo(0,0)};
+  $('#oRef').onclick=loadOmb;
+  const oq=$('#oQ');oq.oninput=()=>{OMB_Q=oq.value;const pos=oq.selectionStart;render();const n=$('#oQ');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}}};
+  $$('[data-oc]').forEach(b=>b.onclick=()=>{OMB_C=b.dataset.oc;render()});
+  const add=name=>{const inp=$$('[data-oq]').find(i=>i.dataset.oq===name);addOmb(name,inp?inp.value:1);render()};
+  $$('[data-oadd]').forEach(b=>b.onclick=()=>add(b.dataset.oadd));
+  $$('[data-oq]').forEach(i=>{i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add(i.dataset.oq)}};i.onfocus=()=>i.select()})}
+
 function render(){
   if(!$('#main'))return;
   $$('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   const pend=`<div id="pendBox">${pendHTML()}</div>`;
-  if(tab==='new')viewNew(pend);else viewToday(pend);
+  if(tab==='new')viewNew(pend);else if(tab==='omb')viewOmb();else viewToday(pend);
   bindPend()}
 const stockTxt=(pid,q)=>{const p=P[pid];if(!p)return '';const f=freeOf(pid);return `Ostatka: ${r2(num(p.stock))}${num(p.reserved)||myOutQty(pid)?` · band: ${r2(num(p.reserved)+myOutQty(pid))} · bo'sh: ${f}`:''}${q!=null&&num(q)>f?' <span class="tag warn">yetmaydi</span>':''}`};
 function catInfo(){if(!INIT)return '';const b=linked()?(INIT.balansErr?`<span style="color:var(--bad)">Hed balans ochilmadi${INIT.stale?' — oxirgi ostatka ko\'rsatilmoqda':''}</span> · `:`Balans katalogi (${prods().length}) · `):'';
@@ -285,7 +330,7 @@ function viewNew(pend){
   <div class="card"><h3 style="display:flex;justify-content:space-between;align-items:center;gap:8px">Mahsulotlar <small class="muted" id="zCat" style="font-weight:400">${catInfo()}</small></h3>
     <div class="xl"><table class="xlt"><thead><tr><th class="xn">№</th><th>Mahsulot nomi</th><th class="xc c-q">Soni</th><th class="xr c-p">Narx</th><th class="xr c-s">Jami</th><th class="c-x"></th></tr></thead><tbody>
     ${F.lines.map((l,i)=>{const p=P[l.pid];const low=p&&num(p.minPrice)>0&&num(l.price)<num(p.minPrice)-0.0001&&INIT.minPriceCheck!==false;
-      return `<tr class="lr"><td class="xn">${i+1}</td><td class="c-n" ${l.src==='manual'?'':`tabindex="0" data-cell="${i}:nm"`}>${l.pid?`<b>${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" data-cell="${i}:nm" value="${esc(l.name)}" placeholder="Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi">`:`<b>${esc(l.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(l.cat||'')}</small>`}${low?`<small class="low">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</td>
+      return `<tr class="lr"><td class="xn">${i+1}</td><td class="c-n" ${l.src==='manual'?'':`tabindex="0" data-cell="${i}:nm"`}>${l.pid?`<b>${esc(p?p.name:l.name)}</b><small class="stk" data-st="${i}">${p?stockTxt(l.pid,l.qty):'<span class="tag warn">katalogda topilmadi</span>'}</small>`:l.src==='manual'?`<input type="text" class="nmi" data-nm="${i}" data-cell="${i}:nm" value="${esc(l.name)}" placeholder="Mahsulot nomi" maxlength="200" aria-label="Mahsulot nomi">`:`<b>${esc(l.name)}</b><small><span class="tag">${l.omb?'Ombor':'Kalkulyator'}</span> ${l.omb?ombTxt(l)||esc(l.cat||''):esc(l.cat||'')}</small>`}${low?`<small class="low">Minimal narx: ${fmt(p.minPrice)}</small>`:''}</td>
       <td class="c-q"><input type="text" inputmode="decimal" data-q="${i}" data-cell="${i}:q" value="${l.qty}" aria-label="Soni" style="text-align:center;font-variant-numeric:tabular-nums"></td>
       <td class="c-p"><input type="text" inputmode="decimal" data-pr="${i}" data-cell="${i}:pr" value="${l.price}" aria-label="Narx"></td>
       <td class="c-s" tabindex="0" data-cell="${i}:s"><b data-sum="${i}">${fmt(lineSum(l))}</b></td>
