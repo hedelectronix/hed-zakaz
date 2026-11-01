@@ -281,6 +281,9 @@ const ombFind=name=>OMB&&OMB.items.find(x=>norm(x.name)===norm(name));
 const ombTxt=l=>{const o=ombFind(l.name);if(!o)return '';return `Omborda: ${r2(o.qty)}${num(l.qty)>o.qty?' <span class="tag warn">yetmaydi</span>':''}`};
 let OC=lsGet('hz_ombc',{lines:[],who:''});if(!OC||!Array.isArray(OC.lines))OC={lines:[],who:''};
 const ocSave=()=>lsSet('hz_ombc',OC);
+(function(){const mv=(F.lines||[]).filter(l=>l.omb);if(!mv.length)return;   // eski qoralamadagi ombor tovarlari mijoz buyurtmasidan ombor ro'yxatiga o'tadi
+  mv.forEach(l=>{const ex=OC.lines.find(x=>norm(x.name)===norm(l.name));if(ex)ex.qty=r2(num(ex.qty)+num(l.qty));else OC.lines.push({name:l.name,cat:l.cat||'',qty:num(l.qty)||1})});
+  F.lines=F.lines.filter(l=>!l.omb);ocSave();saveDraft()})();
 function addOmb(name,qty){const o=ombFind(name);if(!o)return;qty=num(qty)>0?num(qty):1;
   const ex=OC.lines.find(l=>norm(l.name)===norm(name));
   if(ex)ex.qty=r2(num(ex.qty)+qty);else OC.lines.push({name:o.name,cat:o.cat,qty});
