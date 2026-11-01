@@ -165,6 +165,7 @@ const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 
 /* ---------- server (Google Apps Script) ---------- */
 async function api(a,extra,set){
+  if(extra&&extra.order&&extra.order.lines)extra={...extra,order:{...extra.order,lines:extra.order.lines.map(({omb,...r})=>r)}};   // 'omb' belgisi faqat shu ilovada
   set=set||SET;const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);let r;
   try{r=await fetch(set.url,{method:'POST',body:JSON.stringify(Object.assign({a,pin:set.pin},extra||{})),signal:ctl.signal,cache:'no-store',redirect:'follow'})}   // text/plain — Google skriptiga to'g'ridan-to'g'ri (preflightsiz)
   catch(e){const x=new Error("Internet yo'q yoki server javob bermadi");x.net=true;throw x}
@@ -211,7 +212,7 @@ let FLUSHING=null;
 async function flush(){
   if(FLUSHING)return FLUSHING;
   FLUSHING=(async()=>{const todo=OUT.filter(o=>!o._err);if(!todo.length||!SET)return;let changed=false;
-    for(const o of todo){try{const p={...o};delete p._label;delete p._err;const r=await api('order',{order:p});OUT=OUT.filter(x=>x.id!==o.id);changed=true;reserve(o,1);setNet(true);toast(`${o._label||'Buyurtma'} yuborildi · ${r.order.no}`)}
+    for(const o of todo){try{const p={...o};delete p._label;delete p._err;const r=await api('order',{order:p});OUT=OUT.filter(x=>x.id!==o.id);changed=true;reserve(o,1);ombReq(o,r.order.no);setNet(true);toast(`${o._label||'Buyurtma'} yuborildi · ${r.order.no}`)}
       catch(e){if(e.net){setNet(false);break}if(e.auth||e.temp)break;OUT=OUT.map(x=>x.id===o.id?{...x,_err:e.message}:x);changed=true;toast(`Buyurtma yuborilmadi: ${e.message}`,true)}}
     if(changed){lsSet('hz_out',OUT);updPend();if(tab==='today')loadToday(true)}})().finally(()=>{FLUSHING=null});
   return FLUSHING}
@@ -283,6 +284,17 @@ function addOmb(name,qty){const o=ombFind(name);if(!o)return;qty=num(qty)>0?num(
   if(ex)ex.qty=r2(num(ex.qty)+qty);
   else{const c=CALC.find(x=>norm(x.name)===norm(name)||norm(x.full)===norm(name));F.lines.push({src:'calc',omb:1,cat:o.cat,name:o.name,qty,price:c?c.price:0})}
   saveDraft();toast(`${o.name} × ${qty} buyurtmaga qo'shildi`)}
+
+/* ---------- ombordan buyurtma qilingan tovarlar omborchiga boradi (Omborchi ilovasida tebranish bilan chiqadi) ---------- */
+let OQ=lsGet('hz_ombq',[]),OQ_BUSY=false;
+function ombReq(o,no){const ls=(o.lines||[]).filter(l=>l.omb&&num(l.qty)>0);if(!ls.length)return;
+  const cl=o.client||((CL.find(c=>c.id===o.cid)||{}).name)||'';
+  OQ=OQ.filter(x=>x.key!==o.id);OQ.push({a:'req',key:String(o.id||('k'+Date.now())),seller:SELLER,client:cl,no:String(no||''),note:o.note||'',lines:ls.map(l=>({name:l.name,qty:num(l.qty)}))});lsSet('hz_ombq',OQ);flushOmb()}
+async function flushOmb(){if(OQ_BUSY||!OQ.length)return;OQ_BUSY=true;
+  try{for(const q of OQ.slice()){let j;try{const r=await fetch(OMB_URL,{method:'POST',body:JSON.stringify(q),cache:'no-store',redirect:'follow'});j=await r.json()}catch(e){break}
+    if(j&&(j.ok||j.err==='bosh'||j.err==='kop')){OQ=OQ.filter(x=>x.key!==q.key);lsSet('hz_ombq',OQ);if(j.ok)toast("Omborchiga yuborildi");else toast(j.err==='kop'?"Omborchida kutayotgan buyurtmalar juda ko'p — omborchiga ayting":"Omborchiga yuborib bo'lmadi: tovar omborda topilmadi",true)}else break}}
+  finally{OQ_BUSY=false}}
+setTimeout(flushOmb,3000);addEventListener('online',()=>setTimeout(flushOmb,500));
 function viewOmb(){
   if(!OMB||Date.now()-OMB.at>120000)loadOmb();
   const items=OMB?OMB.items:[];const cats=[...new Set(items.map(x=>x.cat).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
@@ -439,7 +451,7 @@ async function save(){
   saving=true;$('#zSave').disabled=true;
   if(!F.id){F.id=uid();saveDraft()}   // bitta qoralama — bitta id: xatodan keyin qayta bosilsa takror buyurtma bo'lmaydi
   const o={id:F.id,date:today(),seller:SELLER,pay:F.pay,cid:k?k.id:'',client:k?k.name:name,phone:k?(k.phone||''):String(F.phone||'').trim(),note:String(F.note||'').trim(),
-    lines:F.lines.map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',src:'balans',name:String(l.name).trim(),qty:num(l.qty),price:num(l.price)}:{src:l.src,cat:l.cat||'',name:String(l.name).trim().replace(/\s+/g,' '),qty:num(l.qty),price:num(l.price)})};
+    lines:F.lines.map(l=>l.pid?{pid:l.pid,unit:l.unit||'dona',src:'balans',name:String(l.name).trim(),qty:num(l.qty),price:num(l.price)}:{src:l.src,cat:l.cat||'',name:String(l.name).trim().replace(/\s+/g,' '),qty:num(l.qty),price:num(l.price),...(l.omb?{omb:1}:{})})};
   const label=(o.client||'Naqd mijoz')+' · '+fmt(total());
   if(F.edit){o.seller=F.edit.seller||SELLER;o.date=F.edit.date||o.date;
     try{const r=await api('edit',{order:o});setNet(true);const old=ORD.find(x=>x.id===o.id);if(old)reserve(old,-1);reserve(o,1);
@@ -450,7 +462,7 @@ async function save(){
     return}
   try{
     let done={...o,no:'',total:total(),time:hmNow(),lines:o.lines.map(l=>({...l,sum:lineSum(l)}))};
-    try{const r=await api('order',{order:o});reserve(o,1);setNet(true);done.no=r.order.no;done.total=r.order.total;toast(`Buyurtma ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
+    try{const r=await api('order',{order:o});reserve(o,1);ombReq(o,r.order.no);setNet(true);done.no=r.order.no;done.total=r.order.total;toast(`Buyurtma ${r.order.no} saqlandi · ${fmt(r.order.total)}${r.order.balans==='Kutilmoqda'?' (balansga keyin yuboriladi)':''}`)}
     catch(e){if(!e.net&&!e.temp)throw e;OUT=OUT.filter(x=>x.id!==o.id);OUT.push({...o,_label:label});lsSet('hz_out',OUT);if(e.net)setNet(false);toast(e.net?"Internet yo'q — buyurtma kompyuterda saqlandi, aloqa tiklanganda yuboriladi":"Server band — buyurtma kompyuterda saqlandi, birozdan keyin o'zi yuboriladi")}
     F=blank();saveDraft();render();window.scrollTo(0,0);pdfModal(done)}
   catch(e){toast(e.message,true);if(e.auth)setTimeout(()=>setupScreen(e.message),1500)}
