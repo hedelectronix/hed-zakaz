@@ -166,6 +166,7 @@ const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 /* ---------- server (Google Apps Script) ---------- */
 async function api(a,extra,set){
   if(extra&&extra.order&&extra.order.lines)extra={...extra,order:{...extra.order,lines:extra.order.lines.map(({omb,...r})=>r)}};   // 'omb' belgisi faqat shu ilovada
+  if(a!=='list'&&a!=='init')for(const k in DAYC)delete DAYC[k];   // yozuvdan keyin ro'yxat keshi eskirgan
   set=set||SET;const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);let r;
   try{r=await fetch(set.url,{method:'POST',body:JSON.stringify(Object.assign({a,pin:set.pin},extra||{})),signal:ctl.signal,cache:'no-store',redirect:'follow'})}   // text/plain — Google skriptiga to'g'ridan-to'g'ri (preflightsiz)
   catch(e){const x=new Error("Internet yo'q yoki server javob bermadi");x.net=true;throw x}
@@ -195,7 +196,7 @@ function priceNum(v){let t=String(v??'').replace(/[^\d.,-]/g,'');if(!t)return 0;
   const x=parseFloat(t);return isFinite(x)?x:0}
 
 /* ---------- ma'lumotlar ---------- */
-function useInit(){P={};for(const p of (INIT&&INIT.products)||[])P[p.id]=p;CL=((INIT&&INIT.clients)||[]).slice();
+function useInit(){P={};_PR=null;_OWN=null;for(const p of (INIT&&INIT.products)||[])P[p.id]=p;CL=((INIT&&INIT.clients)||[]).slice();
   CALC=INIT&&INIT.calcCsv?calcItems(INIT.calcCsv):[];CALC_ST=CALC.length?'ok':INIT&&INIT.calcErr?'err':INIT&&INIT.calcCsv===''?'off':'err'}
 async function loadInit(){
   const j=await api('init');delete j.ok;
@@ -204,7 +205,10 @@ async function loadInit(){
   INIT=Object.assign(j,{at:Date.now()});lsSet('hz_init',INIT);useInit();setNet(true)}
 const myOutQty=pid=>OUT.reduce((a,o)=>a+o.lines.filter(l=>l.pid===pid).reduce((b,l)=>b+num(l.qty),0),0);
 const freeOf=pid=>{const p=P[pid];return p?r2(num(p.stock)-num(p.reserved)-myOutQty(pid)):0};
-const prods=()=>Object.values(P).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+let _PR=null,_OWN=null;const _HAY=new WeakMap();
+const prods=()=>_PR||(_PR=Object.values(P).sort((a,b)=>String(a.name).localeCompare(String(b.name))));
+const hayOf=(x,f)=>{let v=_HAY.get(x);if(v===undefined){v=f(x).toLowerCase();_HAY.set(x,v)}return v};
+const ownNames=()=>_OWN||(_OWN=new Set(prods().map(p=>norm(p.name))));
 const sellers=()=>((INIT&&INIT.sellers)||[]).filter(Boolean);
 
 /* ---------- navbat: internet yo'qligida saqlangan buyurtmalar ---------- */
@@ -223,11 +227,18 @@ function updPend(){const box=$('#pendBox');if(box){box.innerHTML=pendHTML();bind
 const shiftDay=(d,k)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+k);return t.toISOString().slice(0,10)};
 const dmy=d=>String(d||'').split('-').reverse().join('.');
 let LOADSEQ=0;
-async function loadToday(quiet){const seq=++LOADSEQ;const days=[];for(let k=0;k<VR;k++)days.push(shiftDay(VD,-k));
+const DAYC={};   // o'tgan kunlar keshi: har safar qayta yuklanmasin (har qanday yozuvdan keyin tozalanadi, «Yangilash» majburan yuklaydi)
+async function loadToday(quiet,force){const seq=++LOADSEQ;const days=[];for(let k=0;k<VR;k++)days.push(shiftDay(VD,-k));
+  const T=today(),isFresh=d=>!force&&d!==T&&DAYC[d]&&Date.now()-DAYC[d].at<10*60000;
   const out=[];let err='';
-  try{for(let s=0;s<days.length;s+=5){const part=days.slice(s,s+5);const rs=await Promise.all(part.map(d=>api('list',{date:d}).then(r=>({d,r}))));
-      if(seq!==LOADSEQ)return;for(const {d,r} of rs){for(const o of (r.orders||[])){o._d=o.date||d;out.push(o)}if(r.syncErr&&!err)err="Hed balans holatini olib bo'lmadi: "+r.syncErr}}
-    ORD=out;LIST_ERR=err;setNet(true);if(tab==='today')render()}
+  for(const d of days)if(isFresh(d))for(const o of DAYC[d].orders)out.push({...o,_d:o.date||d});
+  const need=days.filter(d=>!isFresh(d)),groups=[];
+  const t0=need.filter(d=>d===T),rest=need.filter(d=>d!==T);if(t0.length)groups.push(t0);for(let s=0;s<rest.length;s+=5)groups.push(rest.slice(s,s+5));
+  const apply=()=>{ORD=out.slice();LIST_ERR=err;setNet(true);if(tab==='today')render()};
+  if(out.length||!groups.length)apply();   // keshdagi kunlar darhol ko'rinadi
+  try{for(const part of groups){const rs=await Promise.all(part.map(d=>api('list',{date:d}).then(r=>({d,r}))));
+      if(seq!==LOADSEQ)return;for(const {d,r} of rs){DAYC[d]={orders:r.orders||[],at:Date.now()};for(const o of (r.orders||[]))out.push({...o,_d:o.date||d});if(r.syncErr&&!err)err="Hed balans holatini olib bo'lmadi: "+r.syncErr}
+      apply()}}
   catch(e){if(seq!==LOADSEQ)return;if(e.net)setNet(false);if(!quiet)toast(e.net?"Internet yo'q":e.message,true)}}
 
 /* ---------- ekranlar ---------- */
@@ -277,7 +288,17 @@ async function loadOmb(){
     OMB={at:Date.now(),updated:j.updated||0,items:j.products.map(x=>({name:String(x.name||'').trim(),cat:String(x.cat||'').trim(),qty:num(x.qty),counted:String(x.counted||'')})).filter(x=>x.name)};lsSet('hz_omb',OMB)}
   catch(e){OMB_ERR=OMB?"Yangilanmadi — oxirgi saqlangan ma'lumot ko'rsatilmoqda":"Ombor ma'lumoti yuklanmadi. Internetni tekshiring."}
   OMB_BUSY=false;if(tab==='omb')render()}
-const ombFind=name=>OMB&&OMB.items.find(x=>norm(x.name)===norm(name));
+let _OI={src:null,m:null};
+const ombFind=name=>{if(!OMB)return null;if(_OI.src!==OMB){const m=new Map();for(const x of OMB.items){const k=norm(x.name);if(!m.has(k))m.set(k,x)}_OI={src:OMB,m}}return _OI.m.get(norm(name))||null};
+const ombN=x=>hayOf(x,y=>norm(y.name+' '+y.cat));
+function ombList(){const items=OMB?OMB.items:[];const words=norm(OMB_Q).split(' ').filter(Boolean);
+  const L=items.filter(x=>(!OMB_C||x.cat===OMB_C)&&words.every(w=>ombN(x).includes(w)));
+  const total=L.reduce((a,x)=>a+x.qty,0);const SH=L.slice(0,300);let rows='',lastCat=null;
+  for(const x of SH){if(!OMB_C&&x.cat!==lastCat){lastCat=x.cat;rows+=`<tr><td colspan="4" style="background:var(--soft);font-weight:700;padding:6px 10px">${esc(x.cat||'Boshqa')}</td></tr>`}
+    const out=x.qty<=0;
+    rows+=`<tr class="lr"><td class="c-n"><b${out?' style="opacity:.55"':''}>${esc(x.name)}</b></td><td style="text-align:right;padding:0 8px;font-weight:700;font-variant-numeric:tabular-nums${out?';color:var(--bad)':''}">${out?'tugagan':r2(x.qty)}</td><td><input type="text" inputmode="decimal" value="1" data-oq="${esc(x.name)}" aria-label="Soni" style="text-align:center" ${out?'disabled':''}></td><td style="text-align:center"><button class="btn sm" data-oadd="${esc(x.name)}" title="Buyurtmaga qo'shish" aria-label="Buyurtmaga qo'shish" style="padding:6px 10px;font-weight:700" ${out?'disabled':''}>＋</button></td></tr>`}
+  if(!rows)rows='<tr><td colspan="4" style="padding:12px;text-align:center" class="muted">Hech narsa topilmadi</td></tr>';
+  return {L,total,rows,sum:`Ko'rsatilgan: ${L.length} xil, jami ${r2(total)} dona`+(L.length>SH.length?` · birinchi ${SH.length} tasi chiqdi, qolganini qidiruv bilan toping`:'')}}
 const ombTxt=l=>{const o=ombFind(l.name);if(!o)return '';return `Omborda: ${r2(o.qty)}${num(l.qty)>o.qty?' <span class="tag warn">yetmaydi</span>':''}`};
 let OC=lsGet('hz_ombc',{lines:[],who:''});if(!OC||!Array.isArray(OC.lines))OC={lines:[],who:''};
 const ocSave=()=>lsSet('hz_ombc',OC);
@@ -305,21 +326,15 @@ setTimeout(flushOmb,3000);addEventListener('online',()=>setTimeout(flushOmb,500)
 function viewOmb(){
   if(!OMB||Date.now()-OMB.at>120000)loadOmb();
   const items=OMB?OMB.items:[];const cats=[...new Set(items.map(x=>x.cat).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const words=norm(OMB_Q).split(' ').filter(Boolean);
-  const L=items.filter(x=>(!OMB_C||x.cat===OMB_C)&&words.every(w=>norm(x.name+' '+x.cat).includes(w)));
   const when=OMB&&OMB.updated?new Date(OMB.updated).toLocaleString('ru-RU',{timeZone:'Asia/Tashkent',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
   const cnt=OMB?[...new Set(OMB.items.map(x=>x.counted).filter(Boolean))].sort().pop():'';
-  const total=L.reduce((a,x)=>a+x.qty,0);
-  let rows='',lastCat=null;
-  for(const x of L){if(!OMB_C&&x.cat!==lastCat){lastCat=x.cat;rows+=`<tr><td colspan="4" style="background:var(--soft);font-weight:700;padding:6px 10px">${esc(x.cat||'Boshqa')}</td></tr>`}
-    const out=x.qty<=0;
-    rows+=`<tr class="lr"><td class="c-n"><b${out?' style="opacity:.55"':''}>${esc(x.name)}</b></td><td style="text-align:right;padding:0 8px;font-weight:700;font-variant-numeric:tabular-nums${out?';color:var(--bad)':''}">${out?'tugagan':r2(x.qty)}</td><td><input type="text" inputmode="decimal" value="1" data-oq="${esc(x.name)}" aria-label="Soni" style="text-align:center" ${out?'disabled':''}></td><td style="text-align:center"><button class="btn sm" data-oadd="${esc(x.name)}" title="Buyurtmaga qo'shish" aria-label="Buyurtmaga qo'shish" style="padding:6px 10px;font-weight:700" ${out?'disabled':''}>＋</button></td></tr>`}
+  const {rows,sum}=ombList();
   const cart=OC.lines.length?`<div class="card"><h3>Omborchiga buyurtma ro'yxati</h3><div class="xl"><table class="xlt" style="min-width:0"><thead><tr><th class="xn">№</th><th>Mahsulot</th><th class="xr" style="width:74px">Omborda</th><th class="xc" style="width:70px">Soni</th><th class="c-x"></th></tr></thead><tbody>${OC.lines.map((l,i)=>{const o=ombFind(l.name);return `<tr class="lr"><td class="xn">${i+1}</td><td class="c-n"><b>${esc(l.name)}</b></td><td style="text-align:right;padding:0 8px">${o?r2(o.qty):'—'}${o&&num(l.qty)>o.qty?' <span class="tag warn">yetmaydi</span>':''}</td><td><input type="text" inputmode="decimal" value="${l.qty}" data-ocq="${i}" aria-label="Soni" style="text-align:center"></td><td class="c-x"><button type="button" data-ocx="${i}" aria-label="O'chirish">×</button></td></tr>`}).join('')}</tbody></table></div><div class="xsearch" style="margin:10px 0 0"><input type="text" id="ocWho" value="${esc(OC.who||'')}" placeholder="Kimga / izoh (ixtiyoriy)" maxlength="120" style="width:100%"></div></div>`:'';
   $('#main').innerHTML=`${`<div id="pendBox">${pendHTML()}</div>`}${cart}<div class="card"><h3 style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Ombor qoldig'i <span style="display:flex;gap:8px;align-items:center"><small class="muted" style="font-weight:400">${OMB?`Sanoq: ${esc(cnt||'—')}${when?` · yangilandi: ${when}`:''}`:''}</small><button class="btn sm" id="oRef" ${OMB_BUSY?'disabled':''}>${OMB_BUSY?'…':'↻ Yangilash'}</button></span></h3>
     ${OMB_ERR?`<div class="pend">${esc(OMB_ERR)}</div>`:''}
     <div class="xsearch" style="margin:6px 0"><input type="search" id="oQ" value="${esc(OMB_Q)}" placeholder="Mahsulot nomini yozing…" autocomplete="off" style="width:100%"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px"><button class="btn sm ${OMB_C?'':'pri'}" data-oc="">Hammasi</button>${cats.map(c=>`<button class="btn sm ${OMB_C===c?'pri':''}" data-oc="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-    ${OMB_BUSY&&!OMB?'<p class="muted">Yuklanmoqda…</p>':!items.length?'<p class="muted">Ma\'lumot yo\'q</p>':`<div class="xl"><table class="xlt" style="min-width:0"><thead><tr><th>Mahsulot</th><th class="xr" style="width:74px">Qoldiq</th><th class="xc" style="width:60px">Soni</th><th style="width:48px"></th></tr></thead><tbody>${rows||'<tr><td colspan="4" style="padding:12px;text-align:center" class="muted">Hech narsa topilmadi</td></tr>'}</tbody></table></div><p class="muted" style="margin:8px 0 0">Ko'rsatilgan: ${L.length} xil, jami ${r2(total)} dona</p>`}</div>`;
+    ${OMB_BUSY&&!OMB?'<p class="muted">Yuklanmoqda…</p>':!items.length?'<p class="muted">Ma\'lumot yo\'q</p>':`<div class="xl"><table class="xlt" style="min-width:0"><thead><tr><th>Mahsulot</th><th class="xr" style="width:74px">Qoldiq</th><th class="xc" style="width:60px">Soni</th><th style="width:48px"></th></tr></thead><tbody id="oTb">${rows}</tbody></table></div><p class="muted" id="oSum" style="margin:8px 0 0">${sum}</p>`}</div>`;
   const nl=OC.lines.length;
   $('#bar').innerHTML=nl?`<div class="sticky"><div class="in"><button class="btn pri" id="oGo" style="width:100%;font-size:17px;padding:14px">Omborchiga yuborish (${nl} ta mahsulot)</button></div></div>`:'';
   if($('#oGo'))$('#oGo').onclick=ocSend;
@@ -327,11 +342,12 @@ function viewOmb(){
   $$('[data-ocx]').forEach(b=>b.onclick=()=>{OC.lines.splice(+b.dataset.ocx,1);ocSave();render()});
   const ow=$('#ocWho');if(ow)ow.oninput=()=>{OC.who=ow.value;ocSave()};
   $('#oRef').onclick=loadOmb;
-  const oq=$('#oQ');oq.oninput=()=>{OMB_Q=oq.value;const pos=oq.selectionStart;render();const n=$('#oQ');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}}};
+  const oq=$('#oQ');let ot=0;oq.oninput=()=>{OMB_Q=oq.value;clearTimeout(ot);ot=setTimeout(()=>{const r=ombList();const tb=$('#oTb');if(!tb){render();return}tb.innerHTML=r.rows;const sm=$('#oSum');if(sm)sm.textContent=r.sum;bindOmbRows()},80)};
   $$('[data-oc]').forEach(b=>b.onclick=()=>{OMB_C=b.dataset.oc;render()});
   const add=name=>{const inp=$$('[data-oq]').find(i=>i.dataset.oq===name);addOmb(name,inp?inp.value:1);render()};
-  $$('[data-oadd]').forEach(b=>b.onclick=()=>add(b.dataset.oadd));
-  $$('[data-oq]').forEach(i=>{i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add(i.dataset.oq)}};i.onfocus=()=>i.select()})}
+  const bindOmbRows=()=>{$$('[data-oadd]').forEach(b=>b.onclick=()=>add(b.dataset.oadd));
+    $$('[data-oq]').forEach(i=>{i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add(i.dataset.oq)}};i.onfocus=()=>i.select()})};
+  bindOmbRows()}
 
 function render(){
   if(!$('#main'))return;
@@ -367,22 +383,23 @@ function viewNew(pend){
   if($('#zCid'))$('#zCid').onchange=e=>{F.cid=e.target.value;saveDraft();render()};
   if($('#zName')){$('#zName').oninput=e=>{F.client=e.target.value;saveDraft()};$('#zPhone').oninput=e=>{F.phone=e.target.value;saveDraft()}}
   $('#zNote').oninput=e=>{F.note=e.target.value;saveDraft()};
-  const q=$('#zQ');q.oninput=()=>{const raw=q.value.trim(),t=raw.toLowerCase();const bx=$('#zRes');if(!t){bx.innerHTML='';return}
-    const words=t.split(/\s+/);const has=s=>{s=String(s).toLowerCase();return words.every(w=>s.includes(w))};
-    const hits=prods().filter(p=>has(p.name+' '+(p.sku||'')+' '+(p.barcode||'')+' '+(p.brand||''))).slice(0,30);
-    const own=new Set(prods().map(p=>norm(p.name)));
-    const ch=CALC.filter(c=>!own.has(norm(c.name))&&has(c.full+' '+c.cat)).slice(0,Math.max(0,30-hits.length));
+  const q=$('#zQ');let qt=0;const run=()=>{qt=0;const raw=q.value.trim(),t=raw.toLowerCase();const bx=$('#zRes');if(!t){bx.innerHTML='';return}
+    const words=t.split(/\s+/);const has=s=>words.every(w=>s.includes(w));
+    const hits=prods().filter(p=>has(hayOf(p,x=>x.name+' '+(x.sku||'')+' '+(x.barcode||'')+' '+(x.brand||'')))).slice(0,30);
+    const own=ownNames();
+    const ch=CALC.filter(c=>!own.has(norm(c.name))&&has(hayOf(c,x=>x.full+' '+x.cat))).slice(0,Math.max(0,30-hits.length));
     bx.innerHTML=`<div class="res">${hits.map(p=>`<div class="item" data-add="${esc(p.id)}"><div class="nm"><b>${esc(p.name)}</b><small>${p.sku?esc(p.sku)+' · ':''}${stockTxt(p.id)}</small></div><b>${fmt(num(p.price))}</b></div>`).join('')}
       ${ch.map(c=>`<div class="item" data-calc="${esc(c.key)}"><div class="nm"><b>${esc(c.name)}</b><small><span class="tag">Kalkulyator</span> ${esc(c.cat)}${c.price>0?'':' · narxi yozilmagan'}</small></div><b>${c.price>0?fmt(c.price):'—'}</b></div>`).join('')}
       <div class="item" data-manual="1"><div class="nm"><b>+ «${esc(raw)}» — qo'lda qo'shish</b><small>${hits.length+ch.length?"Ro'yxatda yo'q bo'lsa":'Topilmadi'} · nomi va narxini o'zingiz yozasiz</small></div></div></div>`;
     $$('[data-add]',bx).forEach(x=>x.onclick=()=>{addLine(x.dataset.add);const nq=$('#zQ');if(nq)nq.focus()});
     $$('[data-calc]',bx).forEach(x=>x.onclick=()=>{addCalc(x.dataset.calc);const nq=$('#zQ');if(nq)nq.focus()});
     $$('[data-manual]',bx).forEach(x=>x.onclick=()=>addManual(raw))};
+  q.oninput=()=>{clearTimeout(qt);qt=setTimeout(run,70)};
   $('#zMan').onclick=()=>addManual('');
   // Excel'dan nusxalab qo'yish: har qator — mahsulot | soni | narx (ustunlar Tab bilan ajratilgan)
   const onPaste=e=>{const txt=(e.clipboardData||window.clipboardData).getData('text')||'';if(!/[\n\t]/.test(txt.trim()))return;e.preventDefault();const n=pasteRows(txt);if(n)toast(n+' ta qator qo\'shildi');else toast("Qatorlar tushunarsiz — ustunlar: mahsulot, soni, narx",true)};
   q.addEventListener('paste',onPaste);$$('[data-cell]').forEach(x=>x.addEventListener('paste',onPaste));
-  q.onkeydown=e=>{const items=$$('#zRes .item');let si=items.findIndex(x=>x.classList.contains('sel'));
+  q.onkeydown=e=>{if(qt){clearTimeout(qt);run()}const items=$$('#zRes .item');let si=items.findIndex(x=>x.classList.contains('sel'));
     if(e.key==='ArrowDown'&&!items.length&&F.lines.length){e.preventDefault();return focusCell(0,NAVCOL)}
     if(e.key==='ArrowUp'&&!items.length){e.preventDefault();if(F.lines.length)focusCell(F.lines.length-1,NAVCOL);return}
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!items.length)return;e.preventDefault();si=e.key==='ArrowDown'?(si+1)%items.length:(si<=0?items.length-1:si-1);items.forEach((x,k)=>x.classList.toggle('sel',k===si));items[si].scrollIntoView({block:'nearest'});return}
@@ -563,7 +580,7 @@ function viewToday(pend){
      <div style="text-align:right;flex:none"><b ${c?'style="text-decoration:line-through"':''}>${fmt(o.total)}</b><br>${c?'<span class="tag bad">Bekor</span>':o.pay==='debt'?'<span class="tag warn">Qarzga</span>':'<span class="tag ok">Naqd</span>'}
      ${c?`<br><button class="btn sm" style="margin-top:6px;color:var(--bad)" data-rm="${esc(o.id)}" title="Jadvaldan butunlay o'chirish">O'chirish</button>`:`<br><button class="btn sm" style="margin-top:6px" data-pdf="${esc(o.id)}" title="Mijoz uchun buyurtma varaqasi (PDF)">PDF</button>`}
      ${c?'':o.delivered?`${linked()?'':`<br><button class="btn sm" style="margin-top:6px" data-undel="${esc(o.id)}">Berilmagan</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}`:`${linked()?'':`<br><button class="btn sm pri" style="margin-top:6px" data-del="${esc(o.id)}">Chiqarildi ✓</button>`}${linked()&&o.balans&&o.balans!=='Kutilmoqda'?'':`<br><button class="btn sm" style="margin-top:6px" data-edit="${esc(o.id)}">O'zgartirish</button>`}<br><button class="btn sm" style="margin-top:6px" data-cancel="${esc(o.id)}">Bekor qilish</button>`}</div></div>`}).join(''):`<p class="muted">${base.length?"Bu bo'limda buyurtma yo'q.":VR>1?"Bu kunlarda buyurtma bo'lmagan.":VD===today()?"Bugun hali buyurtma yo'q.":"Bu kuni buyurtma bo'lmagan."}</p>`}</div></div>`;
-  $('#zRef').onclick=()=>loadToday();
+  $('#zRef').onclick=()=>loadToday(false,true);
   const goD=d=>{if(!d||d>today())return;VD=d;ORD=[];LIST_ERR='';render();loadToday()};
   $$('[data-vr]').forEach(b=>b.onclick=()=>{VR=+b.dataset.vr;lsSet('hz_range',VR);ORD=[];render();loadToday()});
   $('#zDPrev').onclick=()=>goD(shiftDay(VD,-1));$('#zDNext').onclick=()=>goD(shiftDay(VD,1));$('#zD').onchange=e=>goD(e.target.value);if($('#zDToday'))$('#zDToday').onclick=()=>goD(today());
