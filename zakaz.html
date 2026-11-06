@@ -171,7 +171,7 @@ const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 /* ---------- server (Google Apps Script) ---------- */
 async function api(a,extra,set){
   if(extra&&extra.order&&extra.order.lines)extra={...extra,order:{...extra.order,lines:extra.order.lines.map(({omb,...r})=>r)}};   // 'omb' belgisi faqat shu ilovada
-  if(a!=='list'&&a!=='init')for(const k in DAYC)delete DAYC[k];   // yozuvdan keyin ro'yxat keshi eskirgan
+  if(a!=='list'&&a!=='init'){for(const k in DAYC)delete DAYC[k];try{localStorage.removeItem('hz_dayc')}catch(e){}}   // yozuvdan keyin ro'yxat keshi eskirgan
   set=set||SET;const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);let r;
   try{r=await fetch(set.url,{method:'POST',body:JSON.stringify(Object.assign({a,pin:set.pin},extra||{})),signal:ctl.signal,cache:'no-store',redirect:'follow'})}   // text/plain — Google skriptiga to'g'ridan-to'g'ri (preflightsiz)
   catch(e){const x=new Error("Internet yo'q yoki server javob bermadi");x.net=true;throw x}
@@ -232,18 +232,23 @@ function updPend(){const box=$('#pendBox');if(box){box.innerHTML=pendHTML();bind
 const shiftDay=(d,k)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+k);return t.toISOString().slice(0,10)};
 const dmy=d=>String(d||'').split('-').reverse().join('.');
 let LOADSEQ=0;
-const DAYC={};   // o'tgan kunlar keshi: har safar qayta yuklanmasin (har qanday yozuvdan keyin tozalanadi, «Yangilash» majburan yuklaydi)
+let DAYC={};try{DAYC=JSON.parse(localStorage.getItem('hz_dayc')||'{}')||{}}catch(e){DAYC={}}
+let _dcT=0;function saveDC(){clearTimeout(_dcT);_dcT=setTimeout(()=>{try{const T=today(),o={},ks=Object.keys(DAYC).filter(k=>k<T).sort().slice(-150);for(const k of ks)o[k]=DAYC[k];localStorage.setItem('hz_dayc',JSON.stringify(o))}catch(e){}},800)}
+const dayTTL=d=>d<shiftDay(today(),-1)?30*60000:10*60000;
+   // o'tgan kunlar keshi: har safar qayta yuklanmasin (har qanday yozuvdan keyin tozalanadi, «Yangilash» majburan yuklaydi)
 async function loadToday(quiet,force){const seq=++LOADSEQ;const days=[];for(let k=0;k<VR;k++)days.push(shiftDay(VD,-k));
-  const T=today(),isFresh=d=>!force&&d!==T&&DAYC[d]&&Date.now()-DAYC[d].at<10*60000;
+  const T=today(),isFresh=d=>!force&&d!==T&&DAYC[d]&&Date.now()-DAYC[d].at<dayTTL(d);
   const out=[];let err='';
   for(const d of days)if(isFresh(d))for(const o of DAYC[d].orders)out.push({...o,_d:o.date||d});
   const need=days.filter(d=>!isFresh(d)),groups=[];
-  const t0=need.filter(d=>d===T),rest=need.filter(d=>d!==T);if(t0.length)groups.push(t0);for(let s=0;s<rest.length;s+=5)groups.push(rest.slice(s,s+5));
+  const t0=need.filter(d=>d===T),rest=need.filter(d=>d!==T);if(t0.length)groups.push(t0);for(let s=0;s<rest.length;s+=8)groups.push(rest.slice(s,s+8));
   const apply=()=>{ORD=out.slice();LIST_ERR=err;setNet(true);if(tab==='today')render()};
   if(out.length||!groups.length)apply();   // keshdagi kunlar darhol ko'rinadi
-  try{for(const part of groups){const rs=await Promise.all(part.map(d=>api('list',{date:d}).then(r=>({d,r}))));
-      if(seq!==LOADSEQ)return;for(const {d,r} of rs){DAYC[d]={orders:r.orders||[],at:Date.now()};for(const o of (r.orders||[]))out.push({...o,_d:o.date||d});if(r.syncErr&&!err)err="Hed balans holatini olib bo'lmadi: "+r.syncErr}
-      apply()}}
+  const bad=[];
+  try{for(const part of groups){const one=d=>api('list',{date:d}).then(r=>({d,r}));const rs=await Promise.all(part.map(d=>one(d).catch(()=>one(d)).catch(e=>({d,e}))));   // xato bo'lsa bir marta qayta uriniladi
+      if(seq!==LOADSEQ)return;for(const x of rs){if(x.e){bad.push(x);continue}const {d,r}=x;DAYC[d]={orders:r.orders||[],at:Date.now()};for(const o of (r.orders||[]))out.push({...o,_d:o.date||d});if(r.syncErr&&!err)err="Hed balans holatini olib bo'lmadi: "+r.syncErr}
+      apply();saveDC()}
+    if(bad.length){err=(err?err+' · ':'')+'Yuklanmagan kunlar: '+bad.map(x=>dmy(x.d)).join(', ')+" — «Yangilash» ni bosing ("+bad[0].e.message+')';if(bad.every(x=>x.e.net))setNet(false);apply()}}
   catch(e){if(seq!==LOADSEQ)return;if(e.net)setNet(false);if(!quiet)toast(e.net?"Internet yo'q":e.message,true)}}
 
 /* ---------- ekranlar ---------- */
@@ -581,7 +586,7 @@ const MCB={};
 async function loadMonthCounts(ym){if(!SET||MCB[ym])return;const [y,m]=ym.split('-').map(Number);const dim=new Date(Date.UTC(y,m,0)).getUTCDate();const T=today(),need=[];
   for(let d=1;d<=dim;d++){const ds=ym+'-'+String(d).padStart(2,'0');if(ds<=T&&!DAYC[ds])need.push(ds)}
   if(!need.length)return;MCB[ym]=1;
-  try{for(let i=0;i<need.length;i+=5){await Promise.all(need.slice(i,i+5).map(d=>api('list',{date:d}).then(r=>{DAYC[d]={orders:r.orders||[],at:Date.now()}}).catch(()=>{})));if(tab==='today'&&CM===ym)updCal()}}
+  try{for(let i=0;i<need.length;i+=8){await Promise.all(need.slice(i,i+8).map(d=>api('list',{date:d}).then(r=>{DAYC[d]={orders:r.orders||[],at:Date.now()}}).catch(()=>{})));saveDC();if(tab==='today'&&CM===ym)updCal()}}
   finally{delete MCB[ym]}}
 function viewToday(pend){
   $('#bar').innerHTML=`<div class="sticky"><div class="in"><button class="btn pri" id="goNew" style="width:100%;font-size:17px;padding:14px">＋ Yangi buyurtma yozish</button></div></div>`;$('#goNew').onclick=()=>{tab='new';render();window.scrollTo(0,0);setTimeout(()=>{const nq=$('#zQ');if(nq)nq.focus()},50)};
