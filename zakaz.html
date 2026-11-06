@@ -91,6 +91,11 @@ main{max-width:720px;margin:0 auto;padding:14px 16px 120px}
 .xlt tr.lr:nth-child(even) td:not(.xn){background:rgba(127,127,127,.04)}
 .xlt .low{display:block;color:var(--bad);font-size:11px}
 .xlt td[tabindex]{cursor:default}.xlt td[tabindex]:focus{outline:2px solid var(--acc);outline-offset:-2px;background:var(--soft)}
+.calh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.calh b{flex:1;text-align:center}
+.calw,.calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.calw{text-align:center;color:var(--ink2);font-size:12px;font-weight:700;margin-bottom:4px}
+.cd{border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:9px;padding:5px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:46px;font-weight:600}
+.cd small{font-size:11px;line-height:13px;height:13px;color:var(--ink2);font-weight:700}.cd.has{background:var(--okSoft)}.cd.has small{color:var(--ok)}
+.cd.on{background:var(--acc);color:var(--accInk);border-color:var(--acc)}.cd.on small{color:var(--accInk)}.cd.td{outline:2px solid var(--ink);outline-offset:-2px}.cd:disabled{opacity:.3;cursor:default}
 .muted{color:var(--ink2)}
 .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--accSoft);color:var(--ink)}
 .tag.ok{background:var(--okSoft);color:var(--ok)}.tag.warn{background:var(--warnSoft);color:var(--warn)}.tag.bad{background:var(--badSoft);color:var(--bad)}
@@ -148,7 +153,7 @@ const DEF_URL='https://script.google.com/macros/s/AKfycbyI39wOuo4c7-R1pI9wwjfKhi
 let SET=lsGet('hz_set',null);            // {url, pin} — shu kompyuter uchun bir marta
 let INIT=lsGet('hz_init',null);          // server bergan: kompaniya, valyuta, sotuvchilar, kalkulyator, (bog'langan bo'lsa) katalog va ostatka
 let SELLER=lsGet('hz_seller2','');       // shu kompyuterdagi sotuvchi
-let VD=today(),VR=lsGet('hz_range',7),OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all',HQ='';
+let VD=today(),VR=lsGet('hz_range',7),OUT=lsGet('hz_out',[]),ORD=[],LIST_ERR='',tab='new',ONLINE=true,P={},CL=[],CALC=[],CALC_ST='',MINE=true,DF='all',HQ='',CM='';
 let F=lsGet('hz_draft',null)||blank();
 const cur=()=>(INIT&&INIT.currency)||'USD';
 const linked=()=>!!(INIT&&INIT.linked);
@@ -560,6 +565,24 @@ function hzCard(){
  m.onclick=e=>{if(e.target===m)m.remove()};
  setTimeout(()=>n.focus(),50);
 }
+const MN=['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentyabr','Oktyabr','Noyabr','Dekabr'];
+function calHTML(){if(!CM)CM=VD.slice(0,7);const [y,m]=CM.split('-').map(Number);const dim=new Date(Date.UTC(y,m,0)).getUTCDate();const off=(new Date(Date.UTC(y,m-1,1)).getUTCDay()+6)%7;const T=today(),from=shiftDay(VD,-(VR-1));
+  let cells='';for(let i=0;i<off;i++)cells+='<span></span>';
+  for(let d=1;d<=dim;d++){const ds=CM+'-'+String(d).padStart(2,'0');const c=DAYC[ds];const n=c?c.orders.filter(o=>o.status!=='cancelled').length:0;
+    cells+=`<button type="button" class="cd${ds>=from&&ds<=VD?' on':''}${ds===T?' td':''}${n?' has':''}" data-cd="${ds}" ${ds>T?'disabled':''}><span>${d}</span><small>${n||''}</small></button>`}
+  return `<div class="calh"><button type="button" class="btn sm" id="cmPrev" aria-label="Oldingi oy">◀</button><b>${MN[m-1]} ${y}</b><button type="button" class="btn sm" id="cmNext" aria-label="Keyingi oy" ${CM>=T.slice(0,7)?'disabled':''}>▶</button><button type="button" class="btn sm" id="cmAll">Butun oy</button></div><div class="calw">${['Du','Se','Ch','Pa','Ju','Sh','Ya'].map(x=>`<span>${x}</span>`).join('')}</div><div class="calg">${cells}</div>`}
+function updCal(){const e=$('#hzCal');if(e){e.innerHTML=calHTML();bindCal()}}
+function bindCal(){
+  $$('[data-cd]').forEach(b=>b.onclick=()=>{VR=1;lsSet('hz_range2',1);VD=b.dataset.cd;ORD=[];LIST_ERR='';render();loadToday()});
+  const mv=k=>{const [y,m]=CM.split('-').map(Number);CM=new Date(Date.UTC(y,m-1+k,1)).toISOString().slice(0,7);updCal();loadMonthCounts(CM)};
+  $('#cmPrev').onclick=()=>mv(-1);$('#cmNext').onclick=()=>mv(1);
+  $('#cmAll').onclick=()=>{const [y,m]=CM.split('-').map(Number);let end=CM+'-'+String(new Date(Date.UTC(y,m,0)).getUTCDate()).padStart(2,'0');if(end>today())end=today();VR=+end.slice(8,10);VD=end;lsSet('hz_range2',VR);ORD=[];LIST_ERR='';render();loadToday()}}
+const MCB={};
+async function loadMonthCounts(ym){if(!SET||MCB[ym])return;const [y,m]=ym.split('-').map(Number);const dim=new Date(Date.UTC(y,m,0)).getUTCDate();const T=today(),need=[];
+  for(let d=1;d<=dim;d++){const ds=ym+'-'+String(d).padStart(2,'0');if(ds<=T&&!DAYC[ds])need.push(ds)}
+  if(!need.length)return;MCB[ym]=1;
+  try{for(let i=0;i<need.length;i+=5){await Promise.all(need.slice(i,i+5).map(d=>api('list',{date:d}).then(r=>{DAYC[d]={orders:r.orders||[],at:Date.now()}}).catch(()=>{})));if(tab==='today'&&CM===ym)updCal()}}
+  finally{delete MCB[ym]}}
 function viewToday(pend){
   $('#bar').innerHTML=`<div class="sticky"><div class="in"><button class="btn pri" id="goNew" style="width:100%;font-size:17px;padding:14px">＋ Yangi buyurtma yozish</button></div></div>`;$('#goNew').onclick=()=>{tab='new';render();window.scrollTo(0,0);setTimeout(()=>{const nq=$('#zQ');if(nq)nq.focus()},50)};
   const all=ORD.slice().sort((a,b)=>String(b._d||'').localeCompare(String(a._d||''))||String(b.time||'').localeCompare(String(a.time||'')));const hqw=norm(HQ).split(' ').filter(Boolean);const hqOf=o=>norm([o.no,o.client,o.phone,o.seller,o.note,(o.lines||[]).map(l=>l.name).join(' ')].join(' '));const base=(MINE?all.filter(o=>o.seller===SELLER):all).filter(o=>!hqw.length||hqw.every(w=>hqOf(o).includes(w)));
@@ -571,10 +594,9 @@ function viewToday(pend){
    <div class="seg" style="margin-bottom:12px"><button data-df="all" class="${DF==='all'?'on':''}">Hammasi</button><button data-df="wait" class="${DF==='wait'?'on':''}">Berilmagan (${nWait})</button><button data-df="done" class="${DF==='done'?'on':''}">Chiqarildi (${nDone})</button></div>
    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${VR===1?(VD===today()?'Bugun, ':'')+dmy(VD):dmy(shiftDay(VD,-(VR-1)))+' — '+dmy(VD)}</h3><button class="btn sm" id="zRef">Yangilash</button></div>
    <div class="seg" style="margin-bottom:8px">${[[1,'1 kun'],[3,'3 kun'],[7,'7 kun'],[30,'30 kun'],[90,'90 kun']].map(([n,l])=>`<button data-vr="${n}" class="${VR===n?'on':''}">${l}</button>`).join('')}</div>
-   <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><button class="btn sm" id="zDPrev" title="Oldingi kun">◀</button><input type="date" id="zD" value="${VD}" max="${today()}" style="flex:1;padding:7px 10px" title="Oxirgi kun"><button class="btn sm" id="zDNext" title="Keyingi kun" ${VD>=today()?'disabled':''}>▶</button>${VD===today()?'':'<button class="btn sm" id="zDToday">Bugun</button>'}</div>
-   <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:13px;white-space:nowrap">Oy tarixi:</span><input type="month" id="zM" value="${VD.slice(0,7)}" max="${today().slice(0,7)}" style="flex:1;padding:7px 10px" title="Butun oy buyurtmalari"></div>
+   <div id="hzCal" style="margin-bottom:10px">${calHTML()}</div>
    <input type="search" id="zHq" value="${esc(HQ)}" placeholder="Qidirish: mijoz, telefon, buyurtma raqami, mahsulot…" autocomplete="off" style="margin-bottom:8px">
-   <p class="hint" style="margin:0 0 6px">Eski buyurtmalarni oy, sana yoki 90 kungacha oraliq bo'yicha ochib, «O'zgartirish» bilan tahrirlash mumkin. Qidiruv yuklangan buyurtmalar ichidan ishlaydi.</p>
+   <p class="hint" style="margin:0 0 6px">Kalendardan kunni bosing — o'sha kun buyurtmalari chiqadi, «Butun oy» — oyning hammasi. Katakdagi raqam — shu kundagi buyurtmalar soni. Eski buyurtmalarni ham «O'zgartirish» bilan tahrirlash mumkin. Qidiruv yuklangan buyurtmalar ichidan ishlaydi.</p>
    ${linked()?`<p class="hint" style="margin:0 0 6px">Buyurtma Hed balansda sotuvga aylantirilganda o'zi «Chiqarildi» bo'ladi.</p>`:''}
    <div class="list">${L.length?L.map((o,ix)=>{const c=o.status==='cancelled';const sale=/^Sotuv /.test(o.balans||'')?o.balans:'';const hd=VR>1&&(ix===0||L[ix-1]._d!==o._d)?`<div style="padding:10px 2px 4px;font-weight:700;color:var(--ink2);font-size:13px;border-bottom:1px solid var(--line)">${o._d===today()?'Bugun, ':''}${dmy(o._d)} · ${L.filter(x=>x._d===o._d&&x.status!=='cancelled').length} ta</div>`:'';return hd+`<div class="item" style="align-items:flex-start"><div class="nm"><b>${esc(o.no)} · ${esc(o.client||'Naqd mijoz')}</b><small>${esc(o.time||'')}${o.seller?' · '+esc(o.seller):''} · ${o.lines.length} ta mahsulot${o.note?' · '+esc(o.note):''}</small>
      <small style="display:block">${o.lines.map(l=>esc(l.name)+' × '+l.qty).join(', ')}</small><button class="btn sm" style="margin-top:6px" onclick="var d=this.nextElementSibling,s=d.style.display==='none';d.style.display=s?'':'none';this.textContent=s?'Qisqa':'Batafsil';(window.__EXP=window.__EXP||{})['${esc(o.id)}']=s">${(window.__EXP&&window.__EXP[o.id])?'Qisqa':'Batafsil'}</button><div style="display:${(window.__EXP&&window.__EXP[o.id])?'':'none'}"><table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><thead><tr><th style="padding:3px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2);font-weight:600;text-align:left">Nomi</th><th style="padding:3px 0 3px 8px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2);font-weight:600;text-align:right">Soni</th><th style="padding:3px 0 3px 8px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2);font-weight:600;text-align:right">Narxi</th><th style="padding:3px 0 3px 8px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2);font-weight:600;text-align:right">Jami</th></tr></thead><tbody>${o.lines.map((l,i)=>`<tr><td style="padding:4px 0;border-bottom:1px dashed var(--line);vertical-align:top">${i+1}. ${esc(l.name)}</td><td style="padding:4px 0 4px 8px;border-bottom:1px dashed var(--line);text-align:right;white-space:nowrap;vertical-align:top">${esc(l.qty)}</td><td style="padding:4px 0 4px 8px;border-bottom:1px dashed var(--line);text-align:right;white-space:nowrap;vertical-align:top">${fmt(num(l.price))}</td><td style="padding:4px 0 4px 8px;border-bottom:1px dashed var(--line);text-align:right;white-space:nowrap;vertical-align:top;font-weight:700">${fmt(num(l.sum!=null?l.sum:r2(num(l.qty)*num(l.price))))}</td></tr>`).join('')}</tbody></table></div>
@@ -585,8 +607,7 @@ function viewToday(pend){
   $('#zRef').onclick=()=>loadToday(false,true);
   const goD=d=>{if(!d||d>today())return;VD=d;ORD=[];LIST_ERR='';render();loadToday()};
   $$('[data-vr]').forEach(b=>b.onclick=()=>{VR=+b.dataset.vr;lsSet('hz_range',VR);ORD=[];render();loadToday()});
-  $('#zDPrev').onclick=()=>goD(shiftDay(VD,-1));$('#zDNext').onclick=()=>goD(shiftDay(VD,1));$('#zD').onchange=e=>goD(e.target.value);if($('#zDToday'))$('#zDToday').onclick=()=>goD(today());
-  $('#zM').onchange=e=>{const v=e.target.value;if(!/^\d{4}-\d{2}$/.test(v))return;const [y,m]=v.split('-').map(Number);const last=new Date(Date.UTC(y,m,0)).getUTCDate();let end=v+'-'+String(last).padStart(2,'0');if(end>today())end=today();VR=+end.slice(8,10);VD=end;lsSet('hz_range2',VR);ORD=[];LIST_ERR='';render();loadToday()};
+  bindCal();loadMonthCounts(CM);
   const hq=$('#zHq');hq.oninput=()=>{HQ=hq.value;render();const n=$('#zHq');if(n){n.focus();n.setSelectionRange(HQ.length,HQ.length)}};
   $$('[data-mine]').forEach(b=>b.onclick=()=>{MINE=b.dataset.mine==='1';render()});
   $$('[data-df]').forEach(b=>b.onclick=()=>{DF=b.dataset.df;render()});
